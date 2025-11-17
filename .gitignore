@@ -1,1 +1,6 @@
-ckpt
+__pycache__/
+ckpt/
+data/arc1concept-aug-1000/test/
+data/arc1concept-aug-1000/train/
+!data/arc1concept-aug-1000/identifiers.json
+!data/arc1concept-aug-1000/test_puzzles.json

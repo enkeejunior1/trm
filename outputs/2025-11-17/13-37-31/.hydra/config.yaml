@@ -1,0 +1,48 @@
+arch:
+  H_cycles: 3
+  H_layers: 0
+  L_cycles: 4
+  L_layers: 2
+  expansion: 4
+  forward_dtype: bfloat16
+  halt_exploration_prob: 0.1
+  halt_max_steps: 16
+  hidden_size: 512
+  loss:
+    loss_type: stablemax_cross_entropy
+    name: losses@ACTLossHead
+  mlp_t: false
+  name: recursive_reasoning.trm@TinyRecursiveReasoningModel_ACTV1
+  no_ACT_continue: true
+  num_heads: 8
+  pos_encodings: rope
+  puzzle_emb_len: 16
+  puzzle_emb_ndim: 512
+beta1: 0.9
+beta2: 0.95
+checkpoint_every_eval: true
+checkpoint_path: ckpt/arc_v1_public
+data_paths:
+- data/arc1concept-aug-1000
+data_paths_test:
+- data/arc1concept-aug-1000
+ema: true
+ema_rate: 0.999
+epochs: 100000
+eval_interval: 10000
+eval_save_outputs: []
+evaluators:
+- name: arc@ARC
+freeze_weights: false
+global_batch_size: 1
+load_checkpoint: ckpt/arc_v1_public/step_518071
+lr: 0.0001
+lr_min_ratio: 1.0
+lr_warmup_steps: 2000
+min_eval_interval: 0
+project_name: Arc1concept-aug-1000-ACT-torch
+puzzle_emb_lr: 0.01
+puzzle_emb_weight_decay: 0.1
+run_name: arc_v1_public_eval
+seed: 0
+weight_decay: 0.1

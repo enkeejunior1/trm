@@ -21,6 +21,7 @@ from puzzle_dataset import PuzzleDataset, PuzzleDatasetConfig, PuzzleDatasetMeta
 from utils.functions import load_model_class, get_model_source_path
 from models.ema import EMAHelper
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class LossConfig(pydantic.BaseModel):
     model_config = pydantic.ConfigDict(extra='allow')
@@ -101,7 +102,7 @@ def create_model(config: EvalConfig, eval_metadata: PuzzleDatasetMetadata):
     model_cls = load_model_class(config.arch.name)
     loss_head_cls = load_model_class(config.arch.loss.name)
 
-    with torch.device("cuda"):
+    with device:
         model: nn.Module = model_cls(model_cfg)
         print(model)
         model = loss_head_cls(model, **config.arch.loss.__pydantic_extra__)  # type: ignore
@@ -131,7 +132,7 @@ def load_checkpoint(model: nn.Module, config: EvalConfig):
         print(f"Loading checkpoint {config.load_checkpoint}")
 
         # Load state dict
-        state_dict = torch.load(config.load_checkpoint, map_location="cuda", weights_only=False)
+        state_dict = torch.load(config.load_checkpoint, map_location=device, weights_only=False)
 
         # Resize and reset puzzle emb if needed
         puzzle_emb_name = "_orig_mod.model.inner.puzzle_emb.weights"
@@ -193,8 +194,8 @@ def evaluate(
             print(f"Processing batch {processed_batches}: {set_name}")
             
             # To device
-            batch = {k: v.cuda() for k, v in batch.items()}
-            with torch.device("cuda"):
+            batch = {k: v.to(device) for k, v in batch.items()}
+            with device:
                 carry = eval_state.model.initial_carry(batch)  # type: ignore
 
             # Store trajectories for this batch
@@ -278,7 +279,7 @@ def evaluate(
                     sorted(metrics.keys())
                 )  # Sort keys to guarantee consistent order
                 metric_values = torch.zeros(
-                    (len(set_ids), len(metrics.values())), dtype=torch.float32, device="cuda"
+                    (len(set_ids), len(metrics.values())), dtype=torch.float32, device=device
                 )
 
             metric_values[set_id] += torch.stack([metrics[k] for k in metric_keys])
