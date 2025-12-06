@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import os
 import yaml
 import torch
+from datetime import datetime
 from torch import nn
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
@@ -81,6 +82,10 @@ class TSAE(nn.Module):
         topk: int = 64,
         lambda_sparse: float = 1e-3,
         n_registers: int = 4,
+        # --- AuxK-related parameters ---
+        auxk_topk: int = 512,            # k_aux from the paper
+        aux_alpha: float = 1.0 / 32.0,   # L + alpha * L_aux
+        dead_token_threshold: int = 200_000,  # How many tokens of inactivity before considered dead
     ):
         super().__init__()
         H = d_model
@@ -93,11 +98,16 @@ class TSAE(nn.Module):
         self.lambda_sparse = lambda_sparse
         self.n_registers = n_registers
 
-        # 1) spatial attention (L 방향)
+        # Store AuxK configuration
+        self.auxk_topk = auxk_topk
+        self.aux_alpha = aux_alpha
+        self.dead_token_threshold = dead_token_threshold
+
+        # 1) Spatial attention (along L dimension)
         self.attn_l = Attn(H, n_heads, is_causal=False)
         self.norm_l = nn.LayerNorm(H)
 
-        # 2) depth attention (D 방향, causal)
+        # 2) Depth attention (along D dimension, causal)
         self.attn_d = Attn(H, n_heads, is_causal=True)
         self.norm_d = nn.LayerNorm(H)
 
@@ -113,8 +123,15 @@ class TSAE(nn.Module):
         self.bias_pre = nn.Parameter(torch.zeros(H, dtype=DTYPE))
         self.bias_enc = nn.Parameter(torch.zeros(n_features, dtype=DTYPE))
 
-        # 3) query token
+        # 3) Query token
         self.query_token = nn.Parameter(torch.zeros(H, dtype=DTYPE))
+
+        # ---- AuxK statistics buffers ----
+        # Total number of tokens processed so far
+        self.register_buffer("num_tokens_seen", torch.zeros((), dtype=torch.long))
+        # Last activation time (token index) for each latent
+        self.register_buffer("last_active_token", torch.zeros(n_features, dtype=torch.long))
+
 
     @torch.no_grad()
     def normalize_dic(self):
@@ -123,7 +140,7 @@ class TSAE(nn.Module):
     def topk_activation(self, x):
         """
         x: (..., M)
-        TopK만 남기고 나머지 0
+        Keep only TopK activations, set the rest to 0
         """
         if self.topk is None or self.topk >= x.size(-1):
             return x
@@ -135,7 +152,7 @@ class TSAE(nn.Module):
     def forward(self, zL):
         """
         zL: [B, D, L, H]
-        return: dict (loss 포함된 버전)
+        return: dict (includes loss)
         """
         B, D, L, H = zL.shape
         assert D == self.depth, f"depth mismatch: got {D}, expected {self.depth}"
@@ -154,13 +171,13 @@ class TSAE(nn.Module):
                 f"  NaN count: {torch.isnan(zL).sum().item()}, Inf count: {torch.isinf(zL).sum().item()}"
             )
 
-        # -------- 1) L-axis self-attention (각 depth별로) --------
+        # -------- 1) L-axis self-attention (for each depth) --------
         x = torch.cat([self.query_token[None, None, None, :].expand(B, 1, L, H), zL[:, :-1, :, :]], dim=1)
         x = x.view(B * D, L, H)
         x = x + self.attn_l(self.norm_l(x))  # [B*(D+1), L, H]
         x = x.view(B, D, L, H)   # [B, D+1, L, H]
 
-        # -------- 2) D-axis causal self-attention (각 토큰 위치별로) --------
+        # -------- 2) D-axis causal self-attention (for each token position) --------
         # [B, D, L, H] -> [B*L, D, H]
         # No register tokens for causal attention (keeps it simple and efficient)
         x = rearrange(x, 'b d l h -> (b l) d h')
@@ -175,33 +192,28 @@ class TSAE(nn.Module):
         N = B * D * L
         x_src = (zL - x_prior).detach().reshape(N, H)    # [N, H]
         
-        # # Process in chunks
-        # z_n_chunks = []
-        # x_tgt_chunks = []
-        # for i in range(0, N, chunk_size):
-        #     end_i = min(i + chunk_size, N)
-            
-        #     # encoder: x -> logits -> ReLU -> TopK
-        #     logits_chunk = F.linear(x_src[i:end_i] - self.bias_pre[None, :], self.dictionary_enc, self.bias_enc)  # [chunk, M]
-        #     z_n_dense_chunk = F.relu(logits_chunk)
-        #     z_n_chunk = self.topk_activation(z_n_dense_chunk)  # [chunk, M]
-
-        #     # decoder: z_n -> x_novel
-        #     x_tgt_chunk = F.linear(z_n_chunk, self.dictionary_dec)  # [chunk, H]
-        #     z_n_chunks.append(z_n_chunk)
-        #     x_tgt_chunks.append(x_tgt_chunk)
-        # z_n_flat = torch.cat(z_n_chunks, dim=0)  # [N, M]
-        # x_tgt_flat = torch.cat(x_tgt_chunks, dim=0)  # [N, H]
-
         # encoder: x -> logits -> ReLU -> TopK
         logits = F.linear(x_src - self.bias_pre[None, :], self.dictionary_enc, self.bias_enc)  # [N, M]
         z_n_dense = F.relu(logits)
-        z_n_flat = self.topk_activation(z_n_dense)  # [N, M]
+        z_n_flat = self.topk_activation(z_n_dense) 
 
         # decoder: z_n -> x_novel
-        x_tgt_flat = F.linear(z_n_flat, self.dictionary_dec)  # [N, H]
-        x_tgt = x_tgt_flat.view(B, D, L, H)                        # [B, D-1, L, H]
-        z_n = z_n_flat.view(B, D, L, self.n_features)                  # [B, D-1, L, M]
+        x_tgt_flat = F.linear(z_n_flat, self.dictionary_dec) + self.bias_pre[None, :]
+        x_tgt = x_tgt_flat.view(B, D, L, H)
+        z_n = z_n_flat.view(B, D, L, self.n_features)
+
+        # ---- Update activation tracking for AuxK ----
+        with torch.no_grad():
+            # Count tokens processed in this batch (N = B * D * L)
+            tokens_this_batch = z_n_flat.size(0)  # N
+            self.num_tokens_seen += tokens_this_batch
+            
+            # Track which latents were active (> 0) in this batch
+            # z_n_flat: [N, M] -> bool[M]
+            active_mask = (z_n_flat > 0).any(dim=0)
+            
+            # Update last_active_token for active latents to current token count
+            self.last_active_token[active_mask] = self.num_tokens_seen
 
         # Check for NaN/Inf in intermediate outputs
         if torch.isnan(x_tgt).any() or torch.isinf(x_tgt).any():
@@ -212,20 +224,65 @@ class TSAE(nn.Module):
                 f"  dictionary_dec stats: min={self.dictionary_dec.min().item():.4f}, max={self.dictionary_dec.max().item():.4f}"
             )
 
-        # -------- 5) Loss 계산 --------
-        # recon_loss: SAE가 residual을 잘 설명하도록
+        # -------- 5) Main Loss Calculation --------
+        # recon_loss: how well SAE reconstructs the residual
         x_src_reshaped = x_src.view(B, D, L, H)
         recon_loss = F.mse_loss(x_tgt, x_src_reshaped)
-        sparse_loss = z_n.abs().mean()
         
-        loss = recon_loss_attn + recon_loss + self.lambda_sparse * sparse_loss
+        loss_main = recon_loss_attn + recon_loss
         
-        # NaN/Inf check - raise error to stop training
+        # -------- 6) AuxK Loss Calculation --------
+        aux_loss = torch.zeros((), device=zL.device, dtype=zL.dtype)
+        if self.auxk_topk is not None and self.auxk_topk > 0:
+            # Find dead latents (those that haven't been active for a long time)
+            with torch.no_grad():
+                # How long has each latent been inactive (in tokens)?
+                ages = self.num_tokens_seen - self.last_active_token  # [M]
+                dead_mask = ages >= self.dead_token_threshold
+                dead_indices = dead_mask.nonzero(as_tuple=False).squeeze(-1)  # [Nd] or []
+            
+            if dead_indices.numel() > 0:
+                # Among dead latents, sort by age (oldest first)
+                dead_ages = ages[dead_indices].float()
+                k_aux = min(self.auxk_topk, dead_indices.numel())
+                _, sort_idx = torch.sort(dead_ages, descending=True)
+                selected = dead_indices[sort_idx[:k_aux]]  # [k_aux]
+                
+                # Main model reconstruction error e = x_src - x_tgt
+                # Detach e so gradients only flow through aux dictionary
+                e = (x_src_reshaped - x_tgt).detach()  # [B, D, L, H]
+                e_flat = e.view(-1, H)  # [N, H]
+                
+                # Use only the dead latent subset for encoding/decoding
+                W_enc_dead = self.dictionary_enc[selected]          # [k_aux, H]
+                b_enc_dead = self.bias_enc[selected]                # [k_aux]
+                W_dec_dead = self.dictionary_dec[:, selected]       # [H, k_aux]
+                
+                # Encoder: e -> logits_aux -> ReLU
+                logits_aux = F.linear(e_flat - self.bias_pre[None, :],
+                                      W_enc_dead,
+                                      b_enc_dead)                  # [N, k_aux]
+                z_aux = F.relu(logits_aux)
+                
+                # Decoder: z_aux -> e_hat
+                e_hat_flat = F.linear(z_aux, W_dec_dead)            # [N, H]
+                e_hat = e_hat_flat.view_as(e)                       # [B, D, L, H]
+                
+                aux_loss = F.mse_loss(e_hat, e)
+        
+        # Replace NaN/Inf in aux_loss with 0 (as per paper)
+        if torch.isnan(aux_loss) or torch.isinf(aux_loss):
+            aux_loss = torch.zeros_like(aux_loss)
+        
+        # -------- 7) Total Loss --------
+        loss = loss_main + self.aux_alpha * aux_loss
+        
+        # NaN/Inf check - raise error to stop training if main loss has issues
         if torch.isnan(loss) or torch.isinf(loss):
             raise ValueError(
                 f"NaN or Inf detected in loss!\n"
                 f"  recon_loss: {recon_loss.item()}\n"
-                f"  sparse_loss: {sparse_loss.item()}\n"
+                f"  aux_loss: {aux_loss.item()}\n"
                 f"  total_loss: {loss.item()}\n"
                 f"  x_tgt stats: min={x_tgt.min().item():.4f}, max={x_tgt.max().item():.4f}, mean={x_tgt.mean().item():.4f}\n"
                 f"  x_src stats: min={x_src_reshaped.min().item():.4f}, max={x_src_reshaped.max().item():.4f}, mean={x_src_reshaped.mean().item():.4f}\n"
@@ -235,7 +292,7 @@ class TSAE(nn.Module):
             "loss": loss,
             "recon_loss": recon_loss.detach(),
             "recon_loss_attn": recon_loss_attn.detach(),
-            "sparse_loss": sparse_loss.detach(),
+            "aux_loss": aux_loss.detach(),
             "x_prior": x_prior,
             "x_tgt": x_tgt,
             "x_src": x_src_reshaped,
@@ -283,17 +340,41 @@ def validate_sae(
             # Convert to DTYPE
             z_L = z_L.to(dtype=DTYPE)
             
-            # Forward pass through SAE
-            out = sae(z_L)
+            # Process in mini-batches to avoid OOM
+            mini_batch_size = 4  # Smaller for validation to be safe
+            B_full = z_L.shape[0]
+            num_mini_batches = (B_full + mini_batch_size - 1) // mini_batch_size
+            
+            total_loss = 0.0
+            total_recon_loss = 0.0
+            total_recon_loss_attn = 0.0
+            total_aux_loss = 0.0
+            
+            for mini_idx in range(num_mini_batches):
+                start_idx = mini_idx * mini_batch_size
+                end_idx = min(start_idx + mini_batch_size, B_full)
+                
+                z_L_mini = z_L[start_idx:end_idx]
+                
+                # Forward pass
+                out = sae(z_L_mini)
+                
+                # Accumulate metrics
+                total_loss += out['loss'].item() / num_mini_batches
+                total_recon_loss += out['recon_loss'].item() / num_mini_batches
+                total_recon_loss_attn += out['recon_loss_attn'].item() / num_mini_batches
+                total_aux_loss += out['aux_loss'].item() / num_mini_batches
+                
+                del z_L_mini, out
             
             val_metrics = {
-                'val_loss': out['loss'].item(),
-                'val_recon_loss': out['recon_loss'].item(),
-                'val_recon_loss_attn': out['recon_loss_attn'].item(),
-                'val_sparse_loss': out['sparse_loss'].item(),
+                'val_loss': total_loss,
+                'val_recon_loss': total_recon_loss,
+                'val_recon_loss_attn': total_recon_loss_attn,
+                'val_aux_loss': total_aux_loss,
             }
             
-            del z_L, out
+            del z_L
             
             # Only process first batch
             break
@@ -309,9 +390,41 @@ def train(
     val_loader_factory,  # Function to create a new val_loader each epoch
     num_epochs: int = 10,
 ):
-    # Initialize wandb
+    # Model hyperparameters
+    depth, length, d_model = 16, 916, 512
+    n_heads = 16
+    n_features = 4096
+    topk = 64
+    n_registers = 4
+    auxk_topk = 512
+    aux_alpha = 1.0 / 32.0
+    dead_token_threshold = 200_000
+    
+    # Create experiment directory with timestamp and hyperparameters
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    exp_name = f"tsae_d{depth}_h{n_heads}_f{n_features}_k{topk}_auxk{auxk_topk}_{timestamp}"
+    
+    # Update checkpoint path with experiment name
+    base_path = config.checkpoint_path.replace('ckpt/', '')
+    results_path = os.path.join(base_path, 'tsae_runs', exp_name, 'weights')
+    os.makedirs(results_path, exist_ok=True)
+    print(f"Experiment directory: {results_path}")
+    
+    # Initialize wandb with experiment name
     wandb.init(
         project="trm_tsae",
+        name=exp_name,
+        config={
+            "depth": depth,
+            "d_model": d_model,
+            "n_heads": n_heads,
+            "n_features": n_features,
+            "topk": topk,
+            "n_registers": n_registers,
+            "auxk_topk": auxk_topk,
+            "aux_alpha": aux_alpha,
+            "dead_token_threshold": dead_token_threshold,
+        }
     )
     
     # Freeze TRM model to save memory and prevent gradient computation
@@ -320,16 +433,17 @@ def train(
         param.requires_grad = False
     print("TRM model frozen - all parameters set to requires_grad=False")
     
-    depth, length, d_model = 16, 916, 512
-    n_registers = 4
     sae = TSAE(
         d_model=d_model,
         depth=depth,
-        n_heads=8,
-        n_features=4096,
-        topk=64,
+        n_heads=n_heads,
+        n_features=n_features,
+        topk=topk,
         lambda_sparse=1e-3,
         n_registers=n_registers,
+        auxk_topk=auxk_topk,
+        aux_alpha=aux_alpha,
+        dead_token_threshold=dead_token_threshold,
     ).to(device='cuda', dtype=DTYPE)
 
     print(f"SAE initialized with {n_registers} register tokens for spatial attention")
@@ -341,6 +455,7 @@ def train(
 
     """Run multi-epoch training"""
     global_step = 0
+    best_val_loss = float('inf')
     
     for epoch in range(num_epochs):
         print(f"\n{'='*60}")
@@ -350,7 +465,7 @@ def train(
         epoch_losses = []
         epoch_recon_losses = []
         epoch_recon_losses_attn = []
-        epoch_sparse_losses = []
+        epoch_aux_losses = []
         processed_batches = 0
         
         try:
@@ -419,7 +534,7 @@ def train(
                     total_loss = 0.0
                     total_recon_loss = 0.0
                     total_recon_loss_attn = 0.0
-                    total_sparse_loss = 0.0
+                    total_aux_loss = 0.0
                     
                     for mini_idx in range(num_mini_batches):
                         start_idx = mini_idx * mini_batch_size
@@ -445,12 +560,12 @@ def train(
                             batch_loss = out['loss'].item()
                             batch_recon_loss = out['recon_loss'].item()
                             batch_recon_loss_attn = out['recon_loss_attn'].item()
-                            batch_sparse_loss = out['sparse_loss'].item()
+                            batch_aux_loss = out['aux_loss'].item()
                             
                             total_loss += batch_loss / num_mini_batches
                             total_recon_loss += batch_recon_loss / num_mini_batches
                             total_recon_loss_attn += batch_recon_loss_attn / num_mini_batches
-                            total_sparse_loss += batch_sparse_loss / num_mini_batches
+                            total_aux_loss += batch_aux_loss / num_mini_batches
                             
                             # Free memory
                             del z_L_mini, out, sae_loss
@@ -474,7 +589,7 @@ def train(
                             "train/loss": total_loss,
                             "train/recon_loss": total_recon_loss,
                             "train/recon_loss_attn": total_recon_loss_attn,
-                            "train/sparse_loss": total_sparse_loss,
+                            "train/aux_loss": total_aux_loss,
                             "train/epoch": epoch,
                             "train/batch": processed_batches,
                         }, step=global_step)
@@ -483,46 +598,21 @@ def train(
 
                         print(
                             f"  Batch {processed_batches} | Total: {total_loss:.4f} | "
-                            f"recon: {total_recon_loss:.4f}, recon_attn: {total_recon_loss_attn:.4f}, sparse: {total_sparse_loss:.6f}"
+                            f"recon: {total_recon_loss:.4f}, recon_attn: {total_recon_loss_attn:.4f}, "
+                            f"aux: {total_aux_loss:.6f}"
                         )
                         
                         # Accumulate epoch metrics
                         epoch_losses.append(total_loss)
                         epoch_recon_losses.append(total_recon_loss)
                         epoch_recon_losses_attn.append(total_recon_loss_attn)
-                        epoch_sparse_losses.append(total_sparse_loss)
+                        epoch_aux_losses.append(total_aux_loss)
                     
                     # Free z_L and z_H to save memory
                     del z_L, z_H
                     
-                    # Run validation every 100 steps (optional, for more frequent monitoring)
-                    # if global_step % 100 == 0:
-                    #     print(f"\n  Running validation at step {global_step}...")
-                    #     try:
-                    #         # Create a fresh val_loader for consistent first batch
-                    #         val_loader = val_loader_factory()
-                    #         val_metrics = validate_sae(sae, eval_state, val_loader, config)
-                    #         print(f"    Val Loss: {val_metrics['val_loss']:.4f} | "
-                    #               f"Recon: {val_metrics['val_recon_loss']:.4f} | "
-                    #               f"Recon Attn: {val_metrics['val_recon_loss_attn']:.4f} | "
-                    #               f"Sparse: {val_metrics['val_sparse_loss']:.6f}")
-                            
-                    #         # Log validation to wandb
-                    #         wandb.log({
-                    #             "val/loss": val_metrics['val_loss'],
-                    #             "val/recon_loss": val_metrics['val_recon_loss'],
-                    #             "val/recon_loss_attn": val_metrics['val_recon_loss_attn'],
-                    #             "val/sparse_loss": val_metrics['val_sparse_loss'],
-                    #         }, step=global_step)
-                    #     except Exception as e:
-                    #         print(f"    Warning: Validation failed at step {global_step}: {e}")
-                    #         import traceback
-                    #         traceback.print_exc()
-
                     # Save the trained SAE periodically
                     if global_step % 100 == 0:
-                        results_path = config.checkpoint_path.replace('ckpt/', 'weights/')
-                        os.makedirs(results_path, exist_ok=True)
                         sae_save_path = os.path.join(results_path, f"tsae_step_{global_step:06d}.pt")
                         torch.save({
                             'sae_state_dict': sae.state_dict(),
@@ -561,31 +651,61 @@ def train(
         print(f"  Avg Loss: {sum(epoch_losses)/len(epoch_losses):.4f}")
         print(f"  Avg Recon: {sum(epoch_recon_losses)/len(epoch_recon_losses):.4f}")
         print(f"  Avg Recon Attn: {sum(epoch_recon_losses_attn)/len(epoch_recon_losses_attn):.4f}")
-        print(f"  Avg Sparse: {sum(epoch_sparse_losses)/len(epoch_sparse_losses):.6f}")
+        print(f"  Avg Aux: {sum(epoch_aux_losses)/len(epoch_aux_losses):.6f}")
         print(f"{'='*60}\n")
         
-        # Run validation at the end of each epoch (on consistent first batch)
-        print(f"  Running validation at end of epoch {epoch+1}...")
+        # *** VALIDATION: Re-create val_loader each epoch for consistent first batch ***
+        print(f"\n{'*'*60}")
+        print(f"Running Validation at end of Epoch {epoch+1}")
+        print(f"{'*'*60}")
+        val_metrics = None
         try:
             # Create a fresh val_loader each epoch to ensure consistent first batch
+            print(f"  [1/3] Creating fresh validation loader (test split)...")
             val_loader = val_loader_factory()
+            
+            # Run validation
+            print(f"  [2/3] Computing validation metrics on test set...")
             val_metrics = validate_sae(sae, eval_state, val_loader, config)
-            print(f"    Val Loss: {val_metrics['val_loss']:.4f} | "
-                  f"Recon: {val_metrics['val_recon_loss']:.4f} | "
-                  f"Recon Attn: {val_metrics['val_recon_loss_attn']:.4f} | "
-                  f"Sparse: {val_metrics['val_sparse_loss']:.6f}")
+            
+            print(f"  [3/3] ✓ Validation completed!")
+            print(f"        Val Loss: {val_metrics['val_loss']:.4f}")
+            print(f"        Val Recon Loss: {val_metrics['val_recon_loss']:.4f}")
+            print(f"        Val Recon Loss Attn: {val_metrics['val_recon_loss_attn']:.4f}")
+            print(f"        Val Aux Loss: {val_metrics['val_aux_loss']:.6f}")
+            print(f"{'*'*60}\n")
+            
+            # Clear val_loader to free memory
+            del val_loader
+            
+            # Save best model if validation loss improved
+            current_val_loss = val_metrics['val_loss']
+            if current_val_loss < best_val_loss:
+                best_val_loss = current_val_loss
+                best_model_path = os.path.join(results_path, "best_val.pt")
+                torch.save({
+                    'sae_state_dict': sae.state_dict(),
+                    'sae_optim_state_dict': sae_optim.state_dict(),
+                    'global_step': global_step,
+                    'epoch': epoch + 1,
+                    'val_loss': best_val_loss,
+                }, best_model_path)
+                print(f"  🌟 New best validation loss: {best_val_loss:.4f} - saved to {best_model_path}")
+            
         except Exception as e:
-            print(f"    Warning: Validation failed at end of epoch {epoch+1}: {e}")
+            print(f"  ✗ Warning: Validation failed at end of epoch {epoch+1}: {e}")
             import traceback
             traceback.print_exc()
+            print(f"{'*'*60}\n")
             val_metrics = None
         
         # Log epoch summary to wandb
         log_dict = {
+            "epoch/number": epoch + 1,
             "epoch/avg_loss": sum(epoch_losses)/len(epoch_losses),
             "epoch/avg_recon_loss": sum(epoch_recon_losses)/len(epoch_recon_losses),
             "epoch/avg_recon_loss_attn": sum(epoch_recon_losses_attn)/len(epoch_recon_losses_attn),
-            "epoch/avg_sparse_loss": sum(epoch_sparse_losses)/len(epoch_sparse_losses),
+            "epoch/avg_aux_loss": sum(epoch_aux_losses)/len(epoch_aux_losses),
             "epoch/processed_batches": len(epoch_losses),
         }
         if val_metrics is not None:
@@ -593,12 +713,17 @@ def train(
                 "epoch/val_loss": val_metrics['val_loss'],
                 "epoch/val_recon_loss": val_metrics['val_recon_loss'],
                 "epoch/val_recon_loss_attn": val_metrics['val_recon_loss_attn'],
-                "epoch/val_sparse_loss": val_metrics['val_sparse_loss'],
+                "epoch/val_aux_loss": val_metrics['val_aux_loss'],
+                "epoch/best_val_loss": best_val_loss,
             })
+            print(f"  ✓ Logged validation metrics to wandb")
+        else:
+            print(f"  ⚠ Skipping validation metrics logging for epoch {epoch+1}")
+            
         wandb.log(log_dict, step=global_step)
     
     wandb.finish()
-    return sae
+    return sae, results_path
 
 
 @hydra.main(config_path="config", config_name="cfg_eval", version_base=None)
@@ -611,6 +736,7 @@ def launch(hydra_config: DictConfig):
     torch.random.manual_seed(config.seed)
 
     # Dataset - Use split from config for training
+    assert config.split == "train", f"Training must use train split, but got config.split={config.split}"
     eval_loader, eval_metadata = create_dataloader(
         config, 
         config.split,  # "train" or "test"
@@ -645,14 +771,14 @@ def launch(hydra_config: DictConfig):
     # Run training
     print("Starting TSAE training...")
     eval_state.model.eval()
-    tsae = train(config, eval_state, eval_loader, create_val_loader, num_epochs=config.num_epochs)
-    results_path = config.checkpoint_path.replace('ckpt/', 'weights/')
-    os.makedirs(results_path, exist_ok=True)
-    tsae_save_path = os.path.join(results_path, f"tsae_weights.pt")
+    tsae, results_path = train(config, eval_state, eval_loader, create_val_loader, num_epochs=config.num_epochs)
+    
+    # Save final weights
+    tsae_save_path = os.path.join(results_path, f"tsae_final.pt")
     torch.save({
         'tsae_state_dict': tsae.state_dict(),
     }, tsae_save_path)
-    print(f"Saved TSAE weights to {tsae_save_path}")
+    print(f"Saved final TSAE weights to {tsae_save_path}")
 
 if __name__ == "__main__":
     launch()
