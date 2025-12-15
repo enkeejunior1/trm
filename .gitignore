@@ -6,3 +6,9 @@ data/arc1concept-aug-1000/train/
 !data/arc1concept-aug-1000/test_puzzles.json
 results/
 logs/
+data/
+arc_v1_public*/
+results/
+results*/
+wandb/
+outputs/

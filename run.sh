@@ -4,11 +4,11 @@
 #SBATCH --error=logs/%x_%j.err
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --partition=b200-mig45
+#SBATCH --partition=b200-mig45,b200-mig90
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=32
 #SBATCH --time=24:00:00
-#SBATCH --array=1
+#SBATCH --array=0-1
 
 # Environment setup
 module purge
@@ -23,7 +23,7 @@ echo "Job ID: $SLURM_JOB_ID"
 echo "Array Task ID: $SLURM_ARRAY_TASK_ID"
 
 if [ $SLURM_ARRAY_TASK_ID -eq 0 ]; then
-  python sae.py \
+  python sae_fix.py \
     --config-path=ckpt/arc_v1_public \
     --config-name=all_config \
     load_checkpoint=ckpt/arc_v1_public/step_518071 \
@@ -37,7 +37,7 @@ if [ $SLURM_ARRAY_TASK_ID -eq 0 ]; then
 fi 
 
 if [ $SLURM_ARRAY_TASK_ID -eq 1 ]; then
-  python tsae.py \
+  python tsae_fix.py \
     --config-path=ckpt/arc_v1_public \
     --config-name=all_config \
     load_checkpoint=ckpt/arc_v1_public/step_518071 \

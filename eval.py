@@ -182,7 +182,6 @@ def evaluate(
         # Run evaluation
         set_ids = {k: idx for idx, k in enumerate(eval_metadata.sets)}
 
-        save_preds = {}
         metric_keys = []
         metric_values = None
 
@@ -197,21 +196,11 @@ def evaluate(
             batch = {k: v.to(device) for k, v in batch.items()}
             with device:
                 carry = eval_state.model.initial_carry(batch)  # type: ignore
-
-            # Store trajectories for this batch
-            batch_trajectories_L = []
-            batch_trajectories_H = []
             
             # Forward
             inference_steps = 0
             pbar = tqdm.tqdm(desc=f"Inference steps for batch {processed_batches}")
             while True:
-                # Save z_L at each inference step (BEFORE forward pass)
-                # This captures the reasoning trajectory at each step
-                assert hasattr(carry, 'inner_carry') and (hasattr(carry.inner_carry, 'z_L') and hasattr(carry.inner_carry, 'z_H'))
-                batch_trajectories_L.append(carry.inner_carry.z_L.cpu())
-                batch_trajectories_H.append(carry.inner_carry.z_H.cpu())
-                
                 carry, loss, metrics, preds, all_finish = eval_state.model(
                     carry=carry, batch=batch, return_keys=return_keys
                 )
@@ -219,57 +208,14 @@ def evaluate(
                 pbar.update(1)
 
                 if all_finish:
-                    # Save final z_L after last step
-                    assert hasattr(carry, 'inner_carry') and (hasattr(carry.inner_carry, 'z_L') and hasattr(carry.inner_carry, 'z_H'))
-                    batch_trajectories_L.append(carry.inner_carry.z_L.cpu())
-                    batch_trajectories_H.append(carry.inner_carry.z_H.cpu())
                     break
 
             pbar.close()
             print(f"  Completed inference in {inference_steps} steps")
-            
-            # Save predictions, loss, trajectories, and metrics for this batch immediately
-            if config.checkpoint_path is not None:
-                stacked_trajectories_L = torch.stack(batch_trajectories_L, dim=0)
-                stacked_trajectories_H = torch.stack(batch_trajectories_H, dim=0)
-                batch_data = {
-                    'loss': loss.cpu(),
-                    'trajectories_L': stacked_trajectories_L.cpu(),
-                    'trajectories_H': stacked_trajectories_H.cpu(),
-                    'metrics': {k: v.cpu() for k, v in metrics.items()},
-                    'predictions': {},
-                    'batch_info': {}
-                }
-                
-                # Save predictions and relevant batch data
-                for collection_name, collection in [('preds', preds), ('batch', batch)]:
-                    for k, v in collection.items():
-                        if k in config.eval_save_outputs:
-                            if collection_name == 'preds':
-                                batch_data['predictions'][k] = v.cpu()
-                            else:
-                                batch_data['batch_info'][k] = v.cpu()
-                
-                os.makedirs(config.checkpoint_path.replace('ckpt/', 'results/'), exist_ok=True)
-                batch_path = os.path.join(
-                    config.checkpoint_path.replace('ckpt/', 'results/'),
-                    f"batch_data_{processed_batches:04d}.pt"
-                )
-                torch.save(batch_data, batch_path)
-                print(f"  Saved batch data to {batch_path}")
-                print(f"    Loss: {loss.item():.4f}")
-                print(f"    Metrics: {metrics}")
-                print(f"    Predictions: {batch_data['predictions']}")
-                print(f"    Batch info: {batch_data['batch_info']}")
-                print(f"    Trajectories_L: {stacked_trajectories_L.shape}")
-                print(f"    Trajectories_H: {stacked_trajectories_H.shape}")
-                del batch_data, stacked_trajectories_L, stacked_trajectories_H
-                exit(0) # TODO: remove
 
             # Update evaluators
             for evaluator in evaluators:
                 evaluator.update_batch(batch, preds)
-            del carry, loss, preds, batch, all_finish
 
             # Aggregate metrics
             set_id = set_ids[set_name]
@@ -283,20 +229,9 @@ def evaluate(
                 )
 
             metric_values[set_id] += torch.stack([metrics[k] for k in metric_keys])
-            del metrics
-
-        # Concatenate saved predictions
-        save_preds = {k: torch.cat(v, dim=0) for k, v in save_preds.items()}
-
-        # Save predictions
-        if config.checkpoint_path is not None:
-            os.makedirs(config.checkpoint_path, exist_ok=True)
             
-            if len(save_preds):
-                torch.save(
-                    save_preds, os.path.join(config.checkpoint_path, f"all_preds.pt")
-                )
-        del save_preds
+            # Clean up to prevent memory accumulation
+            del carry, loss, preds, metrics, batch, all_finish
 
         # Process metrics
         if metric_values is not None:

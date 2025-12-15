@@ -1,16 +1,20 @@
 #!/bin/bash
+#SBATCH --job-name=trm
+#SBATCH --output=logs/%x_%j.out
+#SBATCH --error=logs/%x_%j.err
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --partition=b200-mig45,b200-mig90,dgx-b200-old-driver
+#SBATCH --gres=gpu:1
+#SBATCH --cpus-per-task=16
+#SBATCH --time=01:00:00
 
-# Script to run ARC-AGI-1 visualization
-# Run this from the base directory: /home/yonghyun/trm/
-# Usage: ./analysis-yong/run_visualization.sh <checkpoint_path>
+# Environment setup
+module purge
+source /vast/projects/jgu32/lab/yhpark/miniconda3/etc/profile.d/conda.sh
+conda activate trm
 
-if [ -z "$1" ]; then
-    echo "Usage: $0 <checkpoint_path>"
-    echo "Example: $0 ckpt/arc_v1_public/step_518071"
-    exit 1
-fi
-
-CHECKPOINT_PATH=$1
+CHECKPOINT_PATH=ckpt/arc_v1_public/step_518071
 
 # Get the script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -25,13 +29,11 @@ echo "Checkpoint: $CHECKPOINT_PATH"
 echo ""
 
 # Run visualization script from analysis-yong directory
-python analysis-yong/visualize_arc.py \
-    load_checkpoint=$CHECKPOINT_PATH \
-    checkpoint_path=$(dirname $CHECKPOINT_PATH) \
-    global_batch_size=1 \
-    split=test
+cd $SLURM_SUBMIT_DIR
+
+python visualize_test_data.py --num_puzzles 5
+# python visualize_test_data.py --puzzle_ids "1,10,50,100"
 
 echo ""
 echo "Visualization complete!"
-echo "Results saved to: $(dirname $CHECKPOINT_PATH)/results/visualizations/"
-
+echo "Results saved to: results-analysis/visualizations/"
