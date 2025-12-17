@@ -185,7 +185,7 @@ def main():
     # Parse arguments
     parser = argparse.ArgumentParser(description='Visualize ARC-AGI-1 test puzzles')
     parser.add_argument('--data_path', type=str, 
-                        default='/vast/projects/jgu32/lab/yhpark/trm/data/arc1concept-aug-0',
+                        default='/vast/projects/jgu32/lab/yhpark/trm/data/arc1concept-aug-1000',
                         help='Path to dataset directory')
     parser.add_argument('--output_dir', type=str,
                         default='/vast/projects/jgu32/lab/yhpark/trm/results-analysis/visualizations',

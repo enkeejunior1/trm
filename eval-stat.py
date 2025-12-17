@@ -60,6 +60,7 @@ class EvalConfig(pydantic.BaseModel):
     # Extras
     seed: int = 0
     eval_save_outputs: List[str] = []
+    puzzle_ids: Optional[List[int]] = None  # Filter to specific puzzle IDs (e.g., [1, 10, 50, 100])
 
 @dataclass
 class EvalState:
@@ -134,17 +135,32 @@ def load_checkpoint(model: nn.Module, config: EvalConfig):
         # Load state dict
         state_dict = torch.load(config.load_checkpoint, map_location=device, weights_only=False)
 
-        # Resize and reset puzzle emb if needed
+        # Check puzzle embedding shape - MUST match exactly
         puzzle_emb_name = "_orig_mod.model.inner.puzzle_emb.weights"
         expected_shape: torch.Size = model.model.puzzle_emb.weights.shape  # type: ignore
         if puzzle_emb_name in state_dict:
             puzzle_emb = state_dict[puzzle_emb_name]
             if puzzle_emb.shape != expected_shape:
-                print(f"Resetting puzzle embedding as shape is different. Found {puzzle_emb.shape}, Expected {expected_shape}")
-                # Re-initialize using mean
-                state_dict[puzzle_emb_name] = (
-                    torch.mean(puzzle_emb, dim=0, keepdim=True).expand(expected_shape).contiguous()
+                error_msg = (
+                    f"\n{'='*80}\n"
+                    f"ERROR: Puzzle embedding shape mismatch!\n"
+                    f"{'='*80}\n"
+                    f"Checkpoint has: {puzzle_emb.shape[0]} puzzle embeddings\n"
+                    f"Current dataset needs: {expected_shape[0]} puzzle embeddings\n"
+                    f"\n"
+                    f"This means the checkpoint was trained on a DIFFERENT dataset than\n"
+                    f"the one you're trying to evaluate on.\n"
+                    f"\n"
+                    f"Solutions:\n"
+                    f"  1. Use the SAME dataset for evaluation as was used for training\n"
+                    f"     (Check the checkpoint's all_config.yaml to see training data_paths)\n"
+                    f"  2. Retrain the model on the current dataset\n"
+                    f"\n"
+                    f"Current eval data: {config.data_paths_test if config.data_paths_test else config.data_paths}\n"
+                    f"{'='*80}\n"
                 )
+                raise ValueError(error_msg)
+        
         model.load_state_dict(state_dict, assign=True)
 
 
@@ -192,6 +208,7 @@ def evaluate(
         
         # Track per-puzzle-ID statistics
         puzzle_id_stats = {}  # puzzle_id -> {correct: int, total: int}
+        puzzle_id_first_seen = set()  # Track which puzzle_ids we've already counted (for first-example-only mode)
         
         for set_name, batch, global_batch_size in eval_loader:
             processed_batches += 1
@@ -273,7 +290,7 @@ def evaluate(
             for evaluator in evaluators:
                 evaluator.update_batch(batch, preds)
             
-            # Track per-puzzle-ID exact accuracy
+            # Track per-puzzle-ID exact accuracy (FIRST TEST EXAMPLE ONLY - matching visualize_test_data.py)
             if "puzzle_identifiers" in batch:
                 puzzle_ids = batch["puzzle_identifiers"].cpu().numpy()
                 labels = batch["labels"]
@@ -288,11 +305,17 @@ def evaluate(
                 for pid, is_exact_correct, is_valid in zip(puzzle_ids, seq_is_correct, valid):
                     if is_valid and pid != blank_id:  # Skip padding
                         pid = int(pid)
-                        if pid not in puzzle_id_stats:
-                            puzzle_id_stats[pid] = {"correct": 0, "total": 0}
-                        puzzle_id_stats[pid]["total"] += 1
-                        if is_exact_correct:
-                            puzzle_id_stats[pid]["correct"] += 1
+                        # Filter by puzzle_ids if specified
+                        if config.puzzle_ids is not None and pid not in config.puzzle_ids:
+                            continue
+                        # Only count the FIRST test example for each puzzle_id
+                        if pid not in puzzle_id_first_seen:
+                            puzzle_id_first_seen.add(pid)
+                            if pid not in puzzle_id_stats:
+                                puzzle_id_stats[pid] = {"correct": 0, "total": 0}
+                            puzzle_id_stats[pid]["total"] += 1
+                            if is_exact_correct:
+                                puzzle_id_stats[pid]["correct"] += 1
             
             del carry, loss, preds, batch, all_finish
 
@@ -352,7 +375,10 @@ def evaluate(
             # Print per-puzzle-ID statistics
             if puzzle_id_stats:
                 print("\n" + "="*80)
-                print("Per-Puzzle-ID Exact Accuracy Statistics:")
+                if config.puzzle_ids is not None:
+                    print(f"Per-Puzzle-ID Exact Accuracy Statistics (FIRST TEST EXAMPLE ONLY - Filtered to puzzle_ids: {config.puzzle_ids}):")
+                else:
+                    print("Per-Puzzle-ID Exact Accuracy Statistics (FIRST TEST EXAMPLE ONLY):")
                 print("="*80)
                 
                 sorted_puzzle_ids = sorted(puzzle_id_stats.keys())
@@ -367,28 +393,21 @@ def evaluate(
                 failed_puzzles = sum(1 for stats in puzzle_id_stats.values() 
                                     if stats["correct"] == 0)
                 
-                print(f"\nSummary:")
-                print(f"  Total unique puzzle IDs: {total_puzzles}")
-                print(f"  Total samples: {total_samples}")
-                print(f"  Average samples per puzzle ID: {total_samples / total_puzzles:.2f}")
-                print(f"  Overall sample-level accuracy: {total_correct / total_samples * 100:.2f}%")
-                print(f"\n  Puzzle IDs with 100% accuracy: {perfect_puzzles} ({perfect_puzzles / total_puzzles * 100:.2f}%)")
-                print(f"  Puzzle IDs with partial accuracy: {partial_puzzles} ({partial_puzzles / total_puzzles * 100:.2f}%)")
-                print(f"  Puzzle IDs with 0% accuracy: {failed_puzzles} ({failed_puzzles / total_puzzles * 100:.2f}%)")
-                
-                puzzle_level_accs = [stats["correct"] / stats["total"] 
-                                     for stats in puzzle_id_stats.values() if stats["total"] > 0]
-                avg_puzzle_acc = sum(puzzle_level_accs) / len(puzzle_level_accs) if puzzle_level_accs else 0
-                print(f"  Average puzzle-level exact accuracy: {avg_puzzle_acc * 100:.2f}%")
+                print(f"\nSummary (matching visualize_test_data.py - 1st example per puzzle):")
+                print(f"  Total unique puzzle IDs evaluated: {total_puzzles}")
+                print(f"  Total samples (1 per puzzle): {total_samples}")
+                print(f"  Overall accuracy: {total_correct / total_samples * 100:.2f}% ({total_correct}/{total_samples})")
+                print(f"\n  Puzzles SOLVED (correct): {perfect_puzzles} ({perfect_puzzles / total_puzzles * 100:.2f}%)")
+                print(f"  Puzzles FAILED (incorrect): {failed_puzzles} ({failed_puzzles / total_puzzles * 100:.2f}%)")
                 
                 print(f"\nDetailed breakdown (first 50 puzzle IDs):")
-                print(f"{'Puzzle ID':<12} {'Correct':<10} {'Total':<10} {'Accuracy':<12}")
-                print("-" * 50)
+                print(f"{'Puzzle ID':<12} {'Status':<12}")
+                print("-" * 30)
                 
                 for i, pid in enumerate(sorted_puzzle_ids[:50]):
                     stats = puzzle_id_stats[pid]
-                    acc = stats["correct"] / stats["total"] * 100 if stats["total"] > 0 else 0
-                    print(f"{pid:<12} {stats['correct']:<10} {stats['total']:<10} {acc:<11.2f}%")
+                    status = "✓ SOLVED" if stats["correct"] == 1 else "✗ FAILED"
+                    print(f"{pid:<12} {status:<12}")
                 
                 if len(sorted_puzzle_ids) > 50:
                     print(f"... and {len(sorted_puzzle_ids) - 50} more puzzle IDs")
@@ -425,23 +444,28 @@ def evaluate(
         
         # Save puzzle_id_stats to file
         if puzzle_id_stats and config.checkpoint_path is not None:
+            total_correct = sum(stats["correct"] for stats in puzzle_id_stats.values())
+            total_puzzles = len(puzzle_id_stats)
+            
+            note_text = "Statistics for FIRST TEST EXAMPLE ONLY per puzzle (matching visualize_test_data.py)"
+            if config.puzzle_ids is not None:
+                note_text += f" - Filtered to puzzle_ids: {config.puzzle_ids}"
+            
             puzzle_stats_output = {
+                "note": note_text,
+                "filter": {
+                    "puzzle_ids": config.puzzle_ids if config.puzzle_ids is not None else "all"
+                },
                 "summary": {
-                    "total_puzzles": len(puzzle_id_stats),
-                    "total_samples": sum(stats["total"] for stats in puzzle_id_stats.values()),
-                    "total_correct": sum(stats["correct"] for stats in puzzle_id_stats.values()),
-                    "avg_samples_per_puzzle": sum(stats["total"] for stats in puzzle_id_stats.values()) / len(puzzle_id_stats),
-                    "overall_sample_accuracy": sum(stats["correct"] for stats in puzzle_id_stats.values()) / sum(stats["total"] for stats in puzzle_id_stats.values()),
-                    "avg_puzzle_accuracy": sum(stats["correct"] / stats["total"] for stats in puzzle_id_stats.values() if stats["total"] > 0) / len([s for s in puzzle_id_stats.values() if s["total"] > 0]),
-                    "perfect_puzzles": sum(1 for stats in puzzle_id_stats.values() if stats["correct"] == stats["total"] and stats["total"] > 0),
-                    "partial_puzzles": sum(1 for stats in puzzle_id_stats.values() if 0 < stats["correct"] < stats["total"]),
-                    "failed_puzzles": sum(1 for stats in puzzle_id_stats.values() if stats["correct"] == 0),
+                    "total_puzzles_evaluated": total_puzzles,
+                    "puzzles_solved": sum(1 for stats in puzzle_id_stats.values() if stats["correct"] == 1),
+                    "puzzles_failed": sum(1 for stats in puzzle_id_stats.values() if stats["correct"] == 0),
+                    "overall_accuracy": total_correct / total_puzzles if total_puzzles > 0 else 0,
                 },
                 "per_puzzle": {
                     str(pid): {
+                        "status": "solved" if stats["correct"] == 1 else "failed",
                         "correct": stats["correct"],
-                        "total": stats["total"],
-                        "accuracy": stats["correct"] / stats["total"] if stats["total"] > 0 else 0
                     }
                     for pid, stats in sorted(puzzle_id_stats.items())
                 }

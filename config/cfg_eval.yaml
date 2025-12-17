@@ -24,3 +24,7 @@ seed: 0
 # Number of training epochs for SAE (if doing SAE training)
 num_epochs: 10
 
+# Puzzle embedding mode for non-augmented evaluation
+# Options: "original", "first_augmented", "random_augmented"
+embedding_mode: "original"
+

@@ -212,6 +212,18 @@ def evaluate(
 
             pbar.close()
             print(f"  Completed inference in {inference_steps} steps")
+            
+            # Print batch-level exact accuracy
+            if 'accuracy' in metrics:
+                batch_acc = metrics['accuracy'].item()
+                print(f"  Batch {processed_batches} Exact Accuracy: {batch_acc:.4f} ({batch_acc*100:.2f}%)")
+            
+            # Print all batch metrics for debugging
+            print(f"  Batch {processed_batches} Metrics:")
+            for metric_name, metric_value in sorted(metrics.items()):
+                if metric_name != 'count':
+                    val = metric_value.item() if hasattr(metric_value, 'item') else metric_value
+                    print(f"    {metric_name}: {val:.4f}")
 
             # Update evaluators
             for evaluator in evaluators:

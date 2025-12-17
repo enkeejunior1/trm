@@ -1,14 +1,21 @@
-from typing import Optional, Any, Sequence, List
+from typing import Optional, Any, Sequence, List, Dict, Tuple
 from dataclasses import dataclass
 import os
 import math
 import yaml
 import shutil
 import copy
+import json
 
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
+
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.colors import ListedColormap
+import matplotlib.gridspec as gridspec
+import matplotlib.patches as mpatches
 
 import tqdm
 import wandb
@@ -22,6 +29,307 @@ from utils.functions import load_model_class, get_model_source_path
 from models.ema import EMAHelper
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# =============================================================================
+# VISUALIZATION UTILITIES
+# =============================================================================
+
+# ARC color palette (standard 10 colors used in ARC-AGI)
+ARC_COLORS = [
+    '#000000',  # 0: black
+    '#0074D9',  # 1: blue
+    '#FF4136',  # 2: red
+    '#2ECC40',  # 3: green
+    '#FFDC00',  # 4: yellow
+    '#AAAAAA',  # 5: grey
+    '#F012BE',  # 6: magenta/fuchsia
+    '#FF851B',  # 7: orange
+    '#7FDBFF',  # 8: light blue/sky
+    '#870C25',  # 9: maroon/dark red
+]
+
+
+def decode_arc_grid(tokens: np.ndarray, debug: bool = False) -> np.ndarray:
+    """
+    Decode tokenized ARC grid back to 2D grid.
+    
+    ARC tokenization:
+    - PAD: 0, EOS: 1, Colors 0-9: tokens 2-11
+    """
+    if debug:
+        print(f"  Token shape: {tokens.shape}, unique values: {np.unique(tokens)}")
+    
+    if tokens.ndim == 1:
+        if len(tokens) != 900:
+            tokens = tokens[:900] if len(tokens) > 900 else np.pad(tokens, (0, 900 - len(tokens)))
+        grid_30x30 = tokens.reshape(30, 30).astype(np.int32)
+    else:
+        grid_30x30 = tokens.astype(np.int32)
+    
+    # Find valid rectangle (tokens 2-11)
+    max_area, max_size = 0, (0, 0)
+    num_c = 30
+    for num_r in range(1, 31):
+        for c in range(1, num_c + 1):
+            x = grid_30x30[num_r - 1, c - 1]
+            if x < 2 or x > 11:
+                num_c = c - 1
+                break
+        area = num_r * num_c
+        if area > max_area:
+            max_area, max_size = area, (num_r, num_c)
+    
+    if max_size[0] == 0 or max_size[1] == 0:
+        return np.zeros((1, 1), dtype=np.uint8)
+    
+    cropped = grid_30x30[:max_size[0], :max_size[1]]
+    return (cropped - 2).astype(np.uint8)
+
+
+def visualize_grid(grid: np.ndarray, ax: plt.Axes, title: str = "", 
+                   highlight_color: str = None, show_diff: np.ndarray = None):
+    """Visualize an ARC grid."""
+    H, W = grid.shape
+    cmap = ListedColormap(ARC_COLORS)
+    
+    ax.imshow(grid, cmap=cmap, vmin=0, vmax=9, aspect='equal')
+    
+    for i in range(H + 1):
+        ax.axhline(i - 0.5, color='white', linewidth=0.5, alpha=0.3)
+    for j in range(W + 1):
+        ax.axvline(j - 0.5, color='white', linewidth=0.5, alpha=0.3)
+    
+    if show_diff is not None and show_diff.shape == grid.shape:
+        for i in range(H):
+            for j in range(W):
+                if show_diff[i, j]:
+                    ax.plot(j, i, 'x', color='white', markersize=6, markeredgewidth=2)
+    
+    ax.set_xticks([])
+    ax.set_yticks([])
+    
+    if highlight_color:
+        for spine in ax.spines.values():
+            spine.set_edgecolor(highlight_color)
+            spine.set_linewidth(3)
+    
+    ax.set_title(title, fontsize=10, fontweight='bold')
+    ax.set_xlim(-0.5, W - 0.5)
+    ax.set_ylim(H - 0.5, -0.5)
+
+
+def compute_diff(grid1: np.ndarray, grid2: np.ndarray) -> Tuple[np.ndarray, int]:
+    """Compute difference between two grids."""
+    h1, w1 = grid1.shape
+    h2, w2 = grid2.shape
+    max_h, max_w = max(h1, h2), max(w1, w2)
+    
+    p1 = np.full((max_h, max_w), -1, dtype=np.int32)
+    p2 = np.full((max_h, max_w), -1, dtype=np.int32)
+    p1[:h1, :w1] = grid1
+    p2[:h2, :w2] = grid2
+    
+    diff = p1 != p2
+    return diff[:h1, :w1], int(np.sum(diff))
+
+
+def visualize_single_prediction(
+    puzzle_name: str,
+    puzzle_id: int,
+    demo_examples: List[Dict],
+    test_input: np.ndarray,
+    test_label: np.ndarray,
+    prediction: np.ndarray,
+    output_path: str,
+    loss: float = None,
+) -> Dict:
+    """Visualize a single puzzle prediction."""
+    num_demo = min(len(demo_examples), 4)
+    total_rows = num_demo + 2
+    
+    fig, axes = plt.subplots(total_rows, 2, figsize=(8, total_rows * 2.5))
+    if total_rows == 1:
+        axes = axes[np.newaxis, :]
+    
+    # Demo examples
+    for row, demo in enumerate(demo_examples[:num_demo]):
+        in_g = np.array(demo['input'], dtype=np.uint8)
+        out_g = np.array(demo['output'], dtype=np.uint8)
+        visualize_grid(in_g, axes[row, 0], f"Demo {row+1} - Input")
+        visualize_grid(out_g, axes[row, 1], f"Demo {row+1} - Output")
+    
+    # Decode grids
+    input_grid = decode_arc_grid(test_input)
+    label_grid = decode_arc_grid(test_label)
+    pred_grid = decode_arc_grid(prediction)
+    
+    # Test target
+    visualize_grid(input_grid, axes[num_demo, 0], "Test - Input")
+    visualize_grid(label_grid, axes[num_demo, 1], "Test - Target", highlight_color='#0074D9')
+    
+    # Prediction
+    is_correct = np.array_equal(label_grid, pred_grid)
+    diff_mask, num_diff = compute_diff(label_grid, pred_grid)
+    
+    status = "CORRECT" if is_correct else f"WRONG ({num_diff} diff)"
+    color = '#2ECC40' if is_correct else '#FF4136'
+    
+    visualize_grid(input_grid, axes[num_demo+1, 0], "Pred - Input")
+    visualize_grid(pred_grid, axes[num_demo+1, 1], f"Pred - {status}",
+                   highlight_color=color, show_diff=diff_mask if not is_correct else None)
+    
+    title = f"{puzzle_name} (ID: {puzzle_id})"
+    if loss is not None:
+        title += f" | Loss: {loss:.4f}"
+    plt.suptitle(title, fontsize=11, fontweight='bold')
+    plt.tight_layout(rect=[0, 0, 1, 0.95])
+    
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    plt.savefig(output_path, dpi=120, bbox_inches='tight')
+    plt.close()
+    
+    return {
+        'puzzle_name': puzzle_name,
+        'puzzle_id': puzzle_id,
+        'is_correct': is_correct,
+        'num_diff': num_diff,
+        'loss': loss,
+    }
+
+
+def create_summary_figure(results: List[Dict], output_path: str, title: str = "Evaluation Summary"):
+    """Create summary visualization."""
+    n = len(results)
+    if n == 0:
+        return
+    
+    correct = sum(1 for r in results if r.get('is_correct', False))
+    incorrect = n - correct
+    
+    fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+    
+    # Accuracy bar chart
+    ax = axes[0]
+    bars = ax.bar(['Correct', 'Incorrect'], [correct, incorrect], 
+                  color=['#2ECC40', '#FF4136'], alpha=0.8)
+    ax.set_ylabel('Count')
+    ax.set_title(f'Prediction Accuracy: {correct}/{n} ({100*correct/n:.1f}%)')
+    for bar, val in zip(bars, [correct, incorrect]):
+        if val > 0:
+            ax.text(bar.get_x() + bar.get_width()/2, val/2, str(val),
+                   ha='center', va='center', fontsize=14, fontweight='bold', color='white')
+    
+    # Loss distribution
+    ax = axes[1]
+    losses = [r['loss'] for r in results if r.get('loss') is not None]
+    if losses:
+        colors = ['#2ECC40' if r.get('is_correct') else '#FF4136' 
+                  for r in results if r.get('loss') is not None]
+        ax.bar(range(len(losses)), losses, color=colors, alpha=0.7)
+        ax.set_xlabel('Example Index')
+        ax.set_ylabel('Loss')
+        ax.set_title(f'Loss per Example (avg: {np.mean(losses):.4f})')
+        ax.axhline(np.mean(losses), color='orange', linestyle='--', label='Mean')
+        ax.legend()
+    
+    plt.suptitle(title, fontsize=13, fontweight='bold')
+    plt.tight_layout(rect=[0, 0, 1, 0.93])
+    
+    os.makedirs(os.path.dirname(output_path) if os.path.dirname(output_path) else '.', exist_ok=True)
+    plt.savefig(output_path, dpi=150, bbox_inches='tight')
+    plt.close()
+
+
+def load_puzzle_metadata(data_path: str) -> Tuple[List[str], Dict]:
+    """Load puzzle identifiers and test puzzles."""
+    identifiers_path = os.path.join(data_path, "identifiers.json")
+    test_puzzles_path = os.path.join(data_path, "test_puzzles.json")
+    
+    identifiers_map = []
+    test_puzzles = {}
+    
+    if os.path.exists(identifiers_path):
+        with open(identifiers_path, 'r') as f:
+            identifiers_map = json.load(f)
+    
+    if os.path.exists(test_puzzles_path):
+        with open(test_puzzles_path, 'r') as f:
+            test_puzzles = json.load(f)
+    
+    return identifiers_map, test_puzzles
+
+
+def visualize_batch(
+    batch_data: Dict,
+    identifiers_map: List[str],
+    test_puzzles: Dict,
+    output_dir: str,
+    batch_idx: int,
+) -> List[Dict]:
+    """Visualize all predictions in a batch."""
+    results = []
+    
+    predictions = batch_data.get('predictions', {})
+    batch_info = batch_data.get('batch_info', {})
+    loss = batch_data.get('loss', None)
+    
+    # Get predictions tensor
+    if 'preds' in predictions:
+        preds = predictions['preds'].numpy() if hasattr(predictions['preds'], 'numpy') else predictions['preds']
+    else:
+        print(f"  Warning: No 'preds' in predictions for batch {batch_idx}")
+        return results
+    
+    inputs = batch_info.get('inputs')
+    labels = batch_info.get('labels')
+    puzzle_ids = batch_info.get('puzzle_identifiers')
+    
+    if inputs is None or labels is None:
+        print(f"  Warning: Missing inputs/labels for batch {batch_idx}")
+        return results
+    
+    inputs = inputs.numpy() if hasattr(inputs, 'numpy') else inputs
+    labels = labels.numpy() if hasattr(labels, 'numpy') else labels
+    puzzle_ids = puzzle_ids.numpy() if puzzle_ids is not None and hasattr(puzzle_ids, 'numpy') else puzzle_ids
+    
+    B = len(inputs)
+    loss_val = loss.item() if loss is not None and hasattr(loss, 'item') else loss
+    
+    for i in range(B):
+        # Get puzzle info
+        pid = int(puzzle_ids[i]) if puzzle_ids is not None and i < len(puzzle_ids) else i
+        if pid < len(identifiers_map):
+            puzzle_name = identifiers_map[pid]
+        else:
+            puzzle_name = f"puzzle_{pid}"
+        
+        base_name = puzzle_name.split("|||")[0] if "|||" in puzzle_name else puzzle_name
+        
+        # Get demo examples
+        demos = test_puzzles.get(base_name, {}).get("train", [])
+        
+        # Create visualization
+        output_path = os.path.join(output_dir, f"batch{batch_idx:03d}_{i:03d}_{base_name}.png")
+        result = visualize_single_prediction(
+            puzzle_name=base_name,
+            puzzle_id=pid,
+            demo_examples=demos,
+            test_input=inputs[i],
+            test_label=labels[i],
+            prediction=preds[i],
+            output_path=output_path,
+            loss=loss_val,
+        )
+        results.append(result)
+        
+        status = "OK" if result['is_correct'] else f"X ({result['num_diff']} diff)"
+        print(f"    [{i+1}/{B}] {base_name}: {status}")
+    
+    return results
+
+# =============================================================================
+# END VISUALIZATION UTILITIES
+# =============================================================================
 
 class LossConfig(pydantic.BaseModel):
     model_config = pydantic.ConfigDict(extra='allow')
@@ -175,9 +483,33 @@ def evaluate(
     RESULT_DIR = config.checkpoint_path.replace("ckpt/", "results/")
     os.makedirs(RESULT_DIR, exist_ok=True)
     reduced_metrics = None
+    
+    # ===========================================
+    # VISUALIZATION SETUP
+    # ===========================================
+    VIZ_DIR = os.path.join(RESULT_DIR, "visualizations")
+    os.makedirs(VIZ_DIR, exist_ok=True)
+    
+    # Load puzzle metadata for visualization
+    data_path = config.data_paths[0] if config.data_paths else None
+    if config.data_paths_test:
+        data_path = config.data_paths_test[0]
+    
+    identifiers_map, test_puzzles = [], {}
+    if data_path:
+        try:
+            identifiers_map, test_puzzles = load_puzzle_metadata(data_path)
+            print(f"Loaded {len(identifiers_map)} puzzle identifiers for visualization")
+        except Exception as e:
+            print(f"Warning: Could not load puzzle metadata: {e}")
+    
+    all_viz_results = []
+    # ===========================================
 
     with torch.inference_mode():
         return_keys = set(config.eval_save_outputs)
+        # Always include "preds" for visualization
+        return_keys.add("preds")
         for evaluator in evaluators:
             evaluator.begin_eval()
             return_keys.update(evaluator.required_outputs)
@@ -280,12 +612,33 @@ def evaluate(
             print(f"  Saved batch data to {batch_path}")
             print(f"    Loss: {loss.item():.4f}")
             print(f"    Metrics: {metrics}")
-            print(f"    Predictions: {batch_data['predictions']}")
-            print(f"    Batch info: {batch_data['batch_info']}")
+            print(f"    Predictions keys: {list(batch_data['predictions'].keys())}")
+            print(f"    Batch info keys: {list(batch_data['batch_info'].keys())}")
             print(f"    Trajectories_L: {stacked_trajectories_L.shape}")
             print(f"    Trajectories_H: {stacked_trajectories_H.shape}")
+            
+            # ===========================================
+            # VISUALIZE THIS BATCH
+            # ===========================================
+            if identifiers_map:
+                print(f"  Creating visualizations for batch {processed_batches}...")
+                try:
+                    batch_viz_results = visualize_batch(
+                        batch_data=batch_data,
+                        identifiers_map=identifiers_map,
+                        test_puzzles=test_puzzles,
+                        output_dir=VIZ_DIR,
+                        batch_idx=processed_batches,
+                    )
+                    all_viz_results.extend(batch_viz_results)
+                    
+                    correct = sum(1 for r in batch_viz_results if r.get('is_correct', False))
+                    print(f"  Batch {processed_batches} visualization: {correct}/{len(batch_viz_results)} correct")
+                except Exception as e:
+                    print(f"  Warning: Visualization failed for batch {processed_batches}: {e}")
+            # ===========================================
+            
             del batch_data, stacked_trajectories_L, stacked_trajectories_H
-            # exit(0) # TODO: remove
 
             # Update evaluators
             for evaluator in evaluators:
@@ -384,6 +737,49 @@ def evaluate(
                 print(f"  Completed {evaluator.__class__.__name__}")
                 
         print("All evaluators completed!")
+        
+        # ===========================================
+        # CREATE VISUALIZATION SUMMARY
+        # ===========================================
+        if all_viz_results:
+            print("\n" + "="*60)
+            print("VISUALIZATION SUMMARY")
+            print("="*60)
+            
+            total = len(all_viz_results)
+            correct = sum(1 for r in all_viz_results if r.get('is_correct', False))
+            
+            print(f"Total examples visualized: {total}")
+            print(f"Correct predictions: {correct} ({100*correct/total:.1f}%)")
+            print(f"Incorrect predictions: {total - correct} ({100*(total-correct)/total:.1f}%)")
+            
+            # Create summary figure
+            summary_path = os.path.join(VIZ_DIR, "evaluation_summary.png")
+            try:
+                create_summary_figure(all_viz_results, summary_path, title="Evaluation Summary")
+                print(f"\nSummary figure saved to: {summary_path}")
+            except Exception as e:
+                print(f"Warning: Could not create summary figure: {e}")
+            
+            # Save results to JSON
+            results_json_path = os.path.join(VIZ_DIR, "visualization_results.json")
+            try:
+                with open(results_json_path, 'w') as f:
+                    json.dump({
+                        'summary': {
+                            'total': total,
+                            'correct': correct,
+                            'accuracy': correct / total if total > 0 else 0,
+                        },
+                        'results': all_viz_results,
+                    }, f, indent=2)
+                print(f"Results JSON saved to: {results_json_path}")
+            except Exception as e:
+                print(f"Warning: Could not save results JSON: {e}")
+            
+            print(f"\nAll visualizations saved to: {VIZ_DIR}")
+            print("="*60)
+        # ===========================================
 
     return reduced_metrics
 

@@ -31,9 +31,19 @@ echo ""
 # Run visualization script from analysis-yong directory
 cd $SLURM_SUBMIT_DIR
 
-python visualize_test_data.py --num_puzzles 5
-# python visualize_test_data.py --puzzle_ids "1,10,50,100"
+# NOTE: Using aug-1000 to match eval-stat.py (checkpoint was trained on aug-1000)
+python analysis-yong/visualize_test_data.py \
+  --data_path data/arc1concept-aug-1000 \
+  --num_puzzles 5
+
+# To visualize specific puzzle IDs (matching eval-stat.py):
+# python analysis-yong/visualize_test_data.py \
+#   --data_path data/arc1concept-aug-1000 \
+#   --puzzle_ids "1,10,50,100"
 
 echo ""
 echo "Visualization complete!"
 echo "Results saved to: results-analysis/visualizations/"
+echo ""
+echo "Now run eval-stat.py with the same puzzle_ids to get accuracy!"
+echo "Example: python eval-stat.py ... ++puzzle_ids=[1,10,50,100]"

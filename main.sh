@@ -15,22 +15,24 @@ source /vast/projects/jgu32/lab/yhpark/miniconda3/etc/profile.d/conda.sh
 conda activate trm
 cd $SLURM_SUBMIT_DIR
 
-python eval.py \
+# Option 1: Evaluate specific puzzles (matching visualization)
+# NOTE: Change puzzle_ids to match what you visualized
+python eval-stat.py \
   --config-path=ckpt/arc_v1_public \
   --config-name=all_config \
   load_checkpoint=ckpt/arc_v1_public/step_518071 \
   data_paths="[data/arc1concept-aug-1000]" \
   data_paths_test="[data/arc1concept-aug-1000]" \
-  global_batch_size=4096 \
-  checkpoint_path=ckpt/arc_v1_public \
-  evaluators="[]"
+  global_batch_size=1 \
+  checkpoint_path=results/arc_v1_public/step_518071_eval_aug1000 \
+  evaluators="[]" \
+  ++puzzle_ids="[1,2,3,4,5,6,7,8,9,10]"
 
-# python eval-stat.py \
+# python eval.py \
 #   --config-path=ckpt/arc_v1_public \
 #   --config-name=all_config \
 #   load_checkpoint=ckpt/arc_v1_public/step_518071 \
 #   data_paths="[data/arc1concept-aug-1000]" \
 #   data_paths_test="[data/arc1concept-aug-1000]" \
 #   global_batch_size=512 \
-#   checkpoint_path=ckpt/arc_v1_public \
 #   evaluators="[]"
