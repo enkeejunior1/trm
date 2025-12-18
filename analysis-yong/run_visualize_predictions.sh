@@ -4,7 +4,7 @@
 #SBATCH --error=logs/%x_%j.err
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --partition=b200-mig45,b200-mig90,dgx-b200
+#SBATCH --partition=b200-mig45,b200-mig90
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=8
 #SBATCH --time=02:00:00
@@ -28,7 +28,7 @@ echo "=============================================="
 
 # Visualize first 20 puzzles with model predictions
 python analysis-yong/visualize_with_predictions.py \
-  --data_path data/arc1concept-aug-0 \
+  --data_path data/arc1concept-aug-1000 \
   --model_data_path data/arc1concept-aug-1000 \
   --checkpoint ckpt/arc_v1_public/step_518071 \
   --config_path ckpt/arc_v1_public \

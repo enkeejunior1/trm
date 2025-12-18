@@ -87,7 +87,18 @@ class ARC:
 
         # Get predictions
         for identifier, input, pred, q in zip(outputs["puzzle_identifiers"].numpy(), outputs["inputs"].numpy(), outputs["preds"].numpy(), q_values.numpy()):
-            name = self.identifier_map[identifier]
+            # Handle offset for out-of-range puzzle IDs (common in aug datasets)
+            if identifier < len(self.identifier_map):
+                name = self.identifier_map[identifier]
+            else:
+                # Try offset correction (identifier - len(identifier_map))
+                offset_id = identifier - len(self.identifier_map)
+                if 0 <= offset_id < len(self.identifier_map):
+                    name = self.identifier_map[offset_id]
+                else:
+                    # Skip this example if we can't resolve the identifier
+                    print(f"Warning: Skipping identifier {identifier} (out of range)")
+                    continue
             orig_name, _inverse_fn = inverse_aug(name)
             
             input_hash = grid_hash(_inverse_fn(_crop(input)))
@@ -106,12 +117,17 @@ class ARC:
     
     def result(self, save_path: Optional[str], rank: int, world_size: int, group: Optional[torch.distributed.ProcessGroup] = None) -> Optional[Dict[str, float]]:
         # Gather predictions to rank 0 for voting
-        global_hmap_preds = [None for _ in range(world_size)] if rank == 0 else None
-        dist.gather_object((self._local_hmap, self._local_preds), global_hmap_preds, dst=0, group=group)
-        
-        # Rank 0 logic
-        if rank != 0:
-            return
+        if world_size > 1:
+            # Distributed mode - gather from all ranks
+            global_hmap_preds = [None for _ in range(world_size)] if rank == 0 else None
+            dist.gather_object((self._local_hmap, self._local_preds), global_hmap_preds, dst=0, group=group)
+            
+            # Rank 0 logic
+            if rank != 0:
+                return
+        else:
+            # Single process mode - no gathering needed
+            global_hmap_preds = [(self._local_hmap, self._local_preds)]
 
         submission = {}
         correct = [0.0 for _ in range(len(self.pass_Ks))]
