@@ -326,6 +326,7 @@ class AblationConfig(pydantic.BaseModel):
     # For progressive mode - ranking metric
     ranking_metric: str = "avg_activation"  # "avg_activation" or "activation_freq"
     max_k_features: int = 20  # Maximum K to test in progressive mode
+    max_error_changes: int = 0  # Stop after N error changes (0 = no limit, run all K)
     
     # For all_individually mode
     only_active_features: bool = True  # Only test features that are active for this sample
@@ -1051,164 +1052,73 @@ def run_individual_feature_ablation(
 def visualize_progressive_ablation(
     test_input: np.ndarray,
     test_label: np.ndarray,
+    original_preds: np.ndarray,
     pred_prev: np.ndarray,
     pred_curr: np.ndarray,
     k_prev: int,
     k_curr: int,
-    ablated_features_prev: List[int],
-    ablated_features_curr: List[int],
     new_feature: int,
     puzzle_name: str,
     puzzle_id: int,
-    metric_name: str,
-    metric_values: np.ndarray,
     output_path: str,
 ):
     """
-    Create visualization for progressive ablation showing change from K to K+1.
+    Create simple visualization: Test Input | Ground Truth | Original (K=0) | K Pred | K+1 Pred
     """
     # Decode grids
     input_grid = decode_arc_grid(test_input)
     label_grid = decode_arc_grid(test_label)
+    orig_pred_grid = decode_arc_grid(original_preds)
     pred_prev_grid = decode_arc_grid(pred_prev)
     pred_curr_grid = decode_arc_grid(pred_curr)
     
+    # Compute correctness and errors
+    is_correct_orig = np.array_equal(label_grid, orig_pred_grid)
     is_correct_prev = np.array_equal(label_grid, pred_prev_grid)
     is_correct_curr = np.array_equal(label_grid, pred_curr_grid)
     
-    diff_prev, num_diff_prev = compute_diff(label_grid, pred_prev_grid)
-    diff_curr, num_diff_curr = compute_diff(label_grid, pred_curr_grid)
-    diff_between, num_diff_between = compute_diff(pred_prev_grid, pred_curr_grid)
+    _, num_diff_orig = compute_diff(label_grid, orig_pred_grid)
+    _, num_diff_prev = compute_diff(label_grid, pred_prev_grid)
+    _, num_diff_curr = compute_diff(label_grid, pred_curr_grid)
     
-    # Create figure with 2 rows, 4 columns
-    fig, axes = plt.subplots(2, 4, figsize=(20, 10))
+    # Create figure with 1 row, 5 columns
+    fig, axes = plt.subplots(1, 5, figsize=(20, 5))
     
-    # Top row: Input, Label, K-prev prediction, K-curr prediction
-    visualize_grid(input_grid, axes[0, 0], "Test Input")
-    visualize_grid(label_grid, axes[0, 1], "Ground Truth", highlight_color='#0074D9')
+    # 1. Test Input
+    visualize_grid(input_grid, axes[0], "Test Input")
     
-    # K-prev prediction
-    status_prev = "✓ CORRECT" if is_correct_prev else f"✗ WRONG ({num_diff_prev} diff)"
+    # 2. Ground Truth
+    visualize_grid(label_grid, axes[1], "Ground Truth", highlight_color='#0074D9')
+    
+    # 3. Original (K=0) Prediction
+    status_orig = "✓" if is_correct_orig else f"✗ ({num_diff_orig} err)"
+    color_orig = '#2ECC40' if is_correct_orig else '#FF4136'
+    visualize_grid(orig_pred_grid, axes[2], f"Original (K=0)\n{status_orig}", highlight_color=color_orig)
+    
+    # 4. K Pred (previous)
+    status_prev = "✓" if is_correct_prev else f"✗ ({num_diff_prev} err)"
     color_prev = '#2ECC40' if is_correct_prev else '#FF4136'
-    title_prev = f"K={k_prev} Pred" if k_prev > 0 else "Original (K=0)"
-    visualize_grid(pred_prev_grid, axes[0, 2], f"{title_prev}\n{status_prev}", 
-                   highlight_color=color_prev,
-                   show_diff=diff_prev if not is_correct_prev else None)
+    visualize_grid(pred_prev_grid, axes[3], f"K={k_prev} Pred\n{status_prev}", highlight_color=color_prev)
     
-    # K-curr prediction
-    status_curr = "✓ CORRECT" if is_correct_curr else f"✗ WRONG ({num_diff_curr} diff)"
+    # 5. K+1 Pred (current)
+    status_curr = "✓" if is_correct_curr else f"✗ ({num_diff_curr} err)"
     color_curr = '#2ECC40' if is_correct_curr else '#FF4136'
-    visualize_grid(pred_curr_grid, axes[0, 3], f"K={k_curr} Pred\n{status_curr}",
-                   highlight_color=color_curr,
-                   show_diff=diff_curr if not is_correct_curr else None)
+    visualize_grid(pred_curr_grid, axes[4], f"K={k_curr} Pred\n{status_curr}", highlight_color=color_curr)
     
-    # Bottom row: Difference visualization, feature info, change summary
-    # Show difference between K-prev and K-curr
-    axes[1, 0].set_title(f"Difference (K={k_prev} vs K={k_curr})\n{num_diff_between} positions changed", fontsize=11)
-    if num_diff_between > 0:
-        diff_vis = np.zeros((*pred_prev_grid.shape, 3))
-        for i in range(pred_prev_grid.shape[0]):
-            for j in range(pred_prev_grid.shape[1]):
-                if diff_between is not None and diff_between[i, j]:
-                    diff_vis[i, j] = [1, 0, 0]  # Red for changed
-                else:
-                    color_idx = int(pred_prev_grid[i, j]) % len(ARC_COLORS)
-                    hex_color = ARC_COLORS[color_idx]
-                    r = int(hex_color[1:3], 16) / 255
-                    g = int(hex_color[3:5], 16) / 255
-                    b = int(hex_color[5:7], 16) / 255
-                    diff_vis[i, j] = [r, g, b]
-        axes[1, 0].imshow(diff_vis, interpolation='nearest')
-    else:
-        axes[1, 0].text(0.5, 0.5, "No Change", ha='center', va='center', 
-                       fontsize=14, transform=axes[1, 0].transAxes)
-    axes[1, 0].set_xticks([])
-    axes[1, 0].set_yticks([])
-    
-    # New feature info
-    axes[1, 1].axis('off')
-    new_feature_metric = metric_values[new_feature] if new_feature < len(metric_values) else 0
-    info_text = f"NEW Ablated Feature:\n"
-    info_text += f"  Feature Index: {new_feature}\n"
-    info_text += f"  {metric_name}: {new_feature_metric:.4f}\n"
-    info_text += f"\n---\n"
-    info_text += f"Previous (K={k_prev}):\n"
-    if k_prev > 0:
-        info_text += f"  Features: {ablated_features_prev[:5]}"
-        if len(ablated_features_prev) > 5:
-            info_text += f"..."
-    else:
-        info_text += f"  (No ablation)"
-    info_text += f"\n\nCurrent (K={k_curr}):\n"
-    info_text += f"  Features: {ablated_features_curr[:5]}"
-    if len(ablated_features_curr) > 5:
-        info_text += f"..."
-    
-    axes[1, 1].text(0.1, 0.9, info_text, fontsize=10, va='top', family='monospace',
-                   transform=axes[1, 1].transAxes)
-    
-    # Change summary
-    axes[1, 2].axis('off')
-    change_text = f"Effect of Adding Feature {new_feature}:\n\n"
-    
-    # Determine effect
-    if is_correct_prev and not is_correct_curr:
-        effect = "DEGRADED (Correct → Wrong)"
-        effect_color = '#FF4136'
-    elif not is_correct_prev and is_correct_curr:
-        effect = "IMPROVED (Wrong → Correct)"
-        effect_color = '#2ECC40'
-    elif num_diff_curr < num_diff_prev:
-        effect = f"IMPROVED ({num_diff_prev} → {num_diff_curr} errors)"
-        effect_color = '#2ECC40'
-    elif num_diff_curr > num_diff_prev:
-        effect = f"DEGRADED ({num_diff_prev} → {num_diff_curr} errors)"
-        effect_color = '#FF4136'
-    else:
-        effect = f"CHANGED (same # errors, {num_diff_between} positions)"
-        effect_color = '#FF851B'
-    
-    change_text += f"Effect: {effect}\n\n"
-    change_text += f"K={k_prev}: {'✓' if is_correct_prev else '✗'} ({num_diff_prev} errors)\n"
-    change_text += f"K={k_curr}: {'✓' if is_correct_curr else '✗'} ({num_diff_curr} errors)\n"
-    change_text += f"\nPositions Changed: {num_diff_between}"
-    
-    axes[1, 2].text(0.1, 0.9, change_text, fontsize=11, va='top', family='monospace',
-                   transform=axes[1, 2].transAxes,
-                   bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
-    
-    # Metric explanation
-    axes[1, 3].axis('off')
-    metric_explain = f"Ranking Metric: {metric_name}\n\n"
-    if metric_name == "avg_activation":
-        metric_explain += "Features are ranked by\nsum of activation values.\n\n"
-        metric_explain += "Higher activation sum =\nMore important feature"
-    else:  # activation_freq
-        metric_explain += "Features are ranked by\nhow often they are active\n(in top-K selection).\n\n"
-        metric_explain += "Higher frequency =\nMore important feature"
-    
-    axes[1, 3].text(0.1, 0.9, metric_explain, fontsize=10, va='top', family='monospace',
-                   transform=axes[1, 3].transAxes)
-    
-    plt.suptitle(f"Progressive Ablation: {puzzle_name} (ID: {puzzle_id})\n"
-                 f"Prediction changed when ablating feature {new_feature} (K: {k_prev} → {k_curr})", 
+    plt.suptitle(f"{puzzle_name} | Errors: {num_diff_prev} → {num_diff_curr} | +Feature {new_feature}", 
                  fontsize=14, fontweight='bold')
-    plt.tight_layout(rect=[0, 0, 1, 0.93])
+    plt.tight_layout(rect=[0, 0, 1, 0.92])
     
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     plt.savefig(output_path, dpi=150, bbox_inches='tight', facecolor='white')
     plt.close()
     
     return {
-        'k_prev': k_prev,
-        'k_curr': k_curr,
-        'new_feature': new_feature,
-        'is_correct_prev': is_correct_prev,
-        'is_correct_curr': is_correct_curr,
-        'num_diff_prev': num_diff_prev,
-        'num_diff_curr': num_diff_curr,
-        'num_changed_positions': num_diff_between,
-        'effect': effect,
+        'k_prev': int(k_prev),
+        'k_curr': int(k_curr),
+        'new_feature': int(new_feature),
+        'num_diff_prev': int(num_diff_prev),
+        'num_diff_curr': int(num_diff_curr),
     }
 
 
@@ -1275,17 +1185,37 @@ def run_progressive_ablation(
     prev_preds = original_preds.copy()
     prev_k = 0
     prev_features = []
+    prev_num_diff = orig_num_diff  # Track previous number of errors
     
     # Record K=0 (original)
     all_k_results.append({
         'k': 0,
         'ablated_features': [],
-        'is_correct': is_correct_orig,
-        'num_diff': orig_num_diff,
-        'prediction_hash': hash(tuple(original_preds.tolist()))
+        'is_correct': bool(is_correct_orig),
+        'num_diff': int(orig_num_diff),
+        'prediction_changed': False,
     })
     
     print(f"    K=0 (original): {'✓' if is_correct_orig else '✗'} ({orig_num_diff} errors)")
+
+    # Generate visualization for original prediction (K=0)
+    orig_filename = f"k00_original.png"
+    orig_output_path = os.path.join(puzzle_dir, orig_filename)
+
+    fig, axes = plt.subplots(1, 3, figsize=(12, 4))
+    input_grid = decode_arc_grid(inputs)
+    visualize_grid(input_grid, axes[0], "Test Input")
+    visualize_grid(label_grid, axes[1], "Ground Truth", highlight_color='#0074D9')
+
+    status_orig = "✓" if is_correct_orig else f"✗ ({orig_num_diff} err)"
+    color_orig = '#2ECC40' if is_correct_orig else '#FF4136'
+    visualize_grid(orig_pred_grid, axes[2], f"Original (K=0)\n{status_orig}", highlight_color=color_orig)
+
+    plt.suptitle(f"{puzzle_name} | Original Prediction", fontsize=14, fontweight='bold')
+    plt.tight_layout(rect=[0, 0, 1, 0.92])
+    plt.savefig(orig_output_path, dpi=150, bbox_inches='tight', facecolor='white')
+    plt.close()
+    print(f"    Saved original prediction visualization: {orig_filename}")
     
     # Progressive ablation: K=1, 2, 3, ..., max_k
     for k in range(1, max_k + 1):
@@ -1308,67 +1238,67 @@ def run_progressive_ablation(
         is_correct_curr = np.array_equal(label_grid, curr_pred_grid)
         _, curr_num_diff = compute_diff(label_grid, curr_pred_grid)
         
-        # Check if prediction changed
-        pred_hash = hash(tuple(curr_preds.tolist()))
-        prev_pred_hash = all_k_results[-1]['prediction_hash']
-        prediction_changed = (pred_hash != prev_pred_hash)
+        # Check if NUMBER OF ERRORS changed (not just grid difference)
+        error_count_changed = (curr_num_diff != prev_num_diff)
         
-        # Record result
+        # Record result (convert numpy types to Python types for JSON)
         k_result = {
-            'k': k,
-            'ablated_features': features_to_ablate,
-            'new_feature': new_feature,
+            'k': int(k),
+            'ablated_features': [int(f) for f in features_to_ablate],
+            'new_feature': int(new_feature),
             'new_feature_metric': float(metric_values[new_feature]),
-            'is_correct': is_correct_curr,
-            'num_diff': curr_num_diff,
-            'prediction_changed': prediction_changed,
-            'prediction_hash': pred_hash
+            'is_correct': bool(is_correct_curr),
+            'num_diff': int(curr_num_diff),
+            'error_count_changed': bool(error_count_changed),
         }
         all_k_results.append(k_result)
         
         # Status indicator
-        change_marker = " *CHANGED*" if prediction_changed else ""
+        change_marker = f" *ERRORS CHANGED: {prev_num_diff}→{curr_num_diff}*" if error_count_changed else ""
         print(f"    K={k}: {'✓' if is_correct_curr else '✗'} ({curr_num_diff} errors) [+feat {new_feature}]{change_marker}")
         
-        # Save visualization ONLY if prediction changed
-        if prediction_changed:
+        # Save visualization ONLY if number of errors changed
+        if error_count_changed:
             filename = f"k{prev_k:02d}_to_k{k:02d}_feat{new_feature:04d}.png"
             output_path = os.path.join(puzzle_dir, filename)
             
             viz_result = visualize_progressive_ablation(
                 test_input=inputs,
                 test_label=labels,
+                original_preds=original_preds,
                 pred_prev=prev_preds,
                 pred_curr=curr_preds,
                 k_prev=prev_k,
                 k_curr=k,
-                ablated_features_prev=prev_features,
-                ablated_features_curr=features_to_ablate,
                 new_feature=new_feature,
                 puzzle_name=puzzle_name,
                 puzzle_id=puzzle_id,
-                metric_name=config.ranking_metric,
-                metric_values=metric_values,
                 output_path=output_path,
             )
             change_visualizations.append(viz_result)
             
-            # Update previous state
-            prev_preds = curr_preds.copy()
-            prev_k = k
-            prev_features = features_to_ablate.copy()
+            # Stop if we've reached max_error_changes
+            if config.max_error_changes > 0 and len(change_visualizations) >= config.max_error_changes:
+                print(f"    Reached max_error_changes={config.max_error_changes}, stopping.")
+                break
+        
+        # ALWAYS update previous state to compare K with K-1
+        prev_preds = curr_preds.copy()
+        prev_k = k
+        prev_features = [int(f) for f in features_to_ablate]
+        prev_num_diff = curr_num_diff  # Track previous error count
     
-    # Save puzzle-level summary
+    # Save puzzle-level summary (convert all numpy types to Python types)
     puzzle_summary = {
         'puzzle_name': puzzle_name,
-        'puzzle_id': puzzle_id,
+        'puzzle_id': int(puzzle_id),
         'ranking_metric': config.ranking_metric,
-        'max_k_tested': max_k,
-        'original_correct': is_correct_orig,
-        'original_diff': orig_num_diff,
-        'ranked_features': list(ranked_indices[:max_k].astype(int)),
+        'max_k_tested': int(max_k),
+        'original_correct': bool(is_correct_orig),
+        'original_diff': int(orig_num_diff),
+        'ranked_features': [int(i) for i in ranked_indices[:max_k]],
         'metric_values_top_k': [float(metric_values[i]) for i in ranked_indices[:max_k]],
-        'all_k_results': [{k: v for k, v in r.items() if k != 'prediction_hash'} for r in all_k_results],
+        'all_k_results': all_k_results,  # Already properly typed
         'num_changes': len(change_visualizations),
         'change_visualizations': change_visualizations,
     }
@@ -1409,6 +1339,7 @@ def main(hydra_config: DictConfig):
         ablation_iterations=list(hydra_config.get('ablation_iterations', [])) if hydra_config.get('ablation_iterations') else None,
         ranking_metric=hydra_config.get('ranking_metric', 'avg_activation'),
         max_k_features=hydra_config.get('max_k_features', 20),
+        max_error_changes=hydra_config.get('max_error_changes', 0),
         only_active_features=hydra_config.get('only_active_features', True),
         save_only_on_change=hydra_config.get('save_only_on_change', True),
         puzzle_ids=list(hydra_config.get('puzzle_ids', [])) if hydra_config.get('puzzle_ids') else None,
@@ -1431,6 +1362,7 @@ def main(hydra_config: DictConfig):
     elif config.ablation_mode == "progressive":
         print(f"  - Ranking Metric: {config.ranking_metric}")
         print(f"  - Max K Features: {config.max_k_features}")
+        print(f"  - Max Error Changes: {config.max_error_changes} (0=no limit)")
         print(f"  - Sort by Iteration: {config.sort_by_iteration}")
         print(f"  - Answer Only: {config.answer_only}")
     else:
@@ -1570,6 +1502,33 @@ def main(hydra_config: DictConfig):
                     total_samples += 1
                     if puzzle_summary['original_correct']:
                         total_original_correct += 1
+                
+                # ========== PROGRESSIVE MODE ==========
+                elif config.ablation_mode == "progressive":
+                    # Create single-sample batch
+                    single_batch = {k: v[i:i+1] for k, v in batch.items()}
+                    single_batch_float = {k: v.to(dtype=DTYPE) if v.dtype.is_floating_point else v for k, v in single_batch.items()}
+                    
+                    # Run progressive ablation
+                    puzzle_summary = run_progressive_ablation(
+                        model=model,
+                        sae=sae,
+                        batch=single_batch,
+                        batch_float=single_batch_float,
+                        sae_features=z_n_orig[i],  # [D, L, M]
+                        original_preds=batch_preds_orig[i],
+                        labels=batch_labels[i],
+                        inputs=batch_inputs[i],
+                        puzzle_name=base_name,
+                        puzzle_id=pid,
+                        output_dir=config.output_dir,
+                        config=config,
+                    )
+                    
+                    all_puzzle_summaries.append(puzzle_summary)
+                    total_samples += 1
+                    if puzzle_summary['original_correct']:
+                        total_original_correct += 1
                     
                 # ========== OTHER MODES (top_k, random, specific, bottom_k) ==========
                 else:
@@ -1667,6 +1626,32 @@ def main(hydra_config: DictConfig):
                 for p in all_puzzle_summaries
             ]
         }
+    elif config.ablation_mode == "progressive":
+        # Aggregate stats from progressive ablation
+        total_changes = sum(p['num_changes'] for p in all_puzzle_summaries)
+        total_k_tested = sum(p['max_k_tested'] for p in all_puzzle_summaries)
+        
+        summary = {
+            'config': {
+                'ablation_mode': config.ablation_mode,
+                'sae_model_type': config.sae_model_type,
+                'ranking_metric': config.ranking_metric,
+                'max_k_features': config.max_k_features,
+                'sort_by_iteration': config.sort_by_iteration,
+                'answer_only': config.answer_only,
+            },
+            'statistics': {
+                'total_puzzles': len(all_puzzle_summaries),
+                'original_correct': total_original_correct,
+                'total_k_tested': total_k_tested,
+                'total_prediction_changes': total_changes,
+                'avg_changes_per_puzzle': total_changes / max(1, len(all_puzzle_summaries)),
+            },
+            'puzzle_summaries': [
+                {k: v for k, v in p.items() if k != 'all_k_results'}  # Exclude detailed k results
+                for p in all_puzzle_summaries
+            ]
+        }
     else:
         summary = {
             'config': {
@@ -1703,6 +1688,14 @@ def main(hydra_config: DictConfig):
         print(f"  Improved predictions: {total_improved}")
         print(f"  Degraded predictions: {total_degraded}")
         print(f"  Unchanged predictions: {total_unchanged}")
+    elif config.ablation_mode == "progressive":
+        print(f"Total puzzles: {len(all_puzzle_summaries)}")
+        print(f"Original correct: {total_original_correct}/{len(all_puzzle_summaries)}")
+        print(f"Ranking metric: {config.ranking_metric}")
+        print(f"Max K tested: {config.max_k_features}")
+        print(f"Total K ablations: {total_k_tested}")
+        print(f"Total prediction changes: {total_changes}")
+        print(f"Avg changes per puzzle: {total_changes / max(1, len(all_puzzle_summaries)):.2f}")
     else:
         print(f"Total samples: {total_samples}")
         print(f"Original accuracy: {total_original_correct}/{total_samples} ({100*total_original_correct/max(1,total_samples):.1f}%)")

@@ -115,14 +115,28 @@ SAE_MODEL_TYPE="sae_fix"
 #   ++puzzle_ids="[0,778,1779,2780,3781,4782,5784,6785,6857,7858,8859,9860,10861,11862,12863,13864,14865,15866,16867,17443]"
 
 # ============================================================================
-# Mode: top_k - Ablate top K most active features together
+# Mode: progressive - Progressive Ablation with K=1,2,3,...
+# Visualizes ONLY when prediction changes from K to K+1
 # ============================================================================
+
 SAE_MODEL_TYPE="sae"
-ABLATION_MODE="top_k"
-NUM_FEATURES_TO_ABLATE=10
+MAX_K=4096
+MAX_ERROR_CHANGES=20  # Stop after N error-change points (0=no limit)
 SORT_BY_ITERATION=1
 ANSWER_ONLY=true
-OUTPUT_DIR="ablation_results_${SAE_MODEL_TYPE}_${ABLATION_MODE}_${NUM_FEATURES_TO_ABLATE}"
+PUZZLE_IDS="[0,778,1779,2780,3781,4782,5784,6785,6857,7858,8859,9860,10861,11862,12863,13864,14865,15866,16867,17443]"
+NUM_VISUALIZE=20
+
+# ------------------------------------------------------------------------------
+# Metric 1: avg_activation - Rank by sum of activation values
+# Higher activation sum = More important feature
+# ------------------------------------------------------------------------------
+RANKING_METRIC="avg_activation"
+OUTPUT_DIR="ablation_progressive_${SAE_MODEL_TYPE}_${RANKING_METRIC}"
+
+echo "=============================================="
+echo "Running Progressive Ablation with ${RANKING_METRIC}"
+echo "=============================================="
 
 rm -rf ${OUTPUT_DIR}
 python ablation_sae_features.py \
@@ -134,13 +148,79 @@ python ablation_sae_features.py \
   global_batch_size=1 \
   ++sae_model_type=${SAE_MODEL_TYPE} \
   ++output_dir=${OUTPUT_DIR} \
-  ++ablation_mode=${ABLATION_MODE} \
-  ++num_features_to_ablate=${NUM_FEATURES_TO_ABLATE} \
-  ++num_visualize=20 \
-  ++top_m_features=50 \
+  ++ablation_mode=progressive \
+  ++ranking_metric=${RANKING_METRIC} \
+  ++max_k_features=${MAX_K} \
+  ++max_error_changes=${MAX_ERROR_CHANGES} \
   ++sort_by_iteration=${SORT_BY_ITERATION} \
   ++answer_only=${ANSWER_ONLY} \
-  ++puzzle_ids="[0,778,1779,2780,3781,4782,5784,6785,6857,7858,8859,9860,10861,11862,12863,13864,14865,15866,16867,17443]"
+  ++num_visualize=${NUM_VISUALIZE} \
+  ++puzzle_ids="${PUZZLE_IDS}"
+
+# ------------------------------------------------------------------------------
+# Metric 2: activation_freq - Rank by how often feature is in top-K (64)
+# Higher frequency = More important feature
+# ------------------------------------------------------------------------------
+RANKING_METRIC="activation_freq"
+OUTPUT_DIR="ablation_progressive_${SAE_MODEL_TYPE}_${RANKING_METRIC}"
+
+echo "=============================================="
+echo "Running Progressive Ablation with ${RANKING_METRIC}"
+echo "=============================================="
+
+rm -rf ${OUTPUT_DIR}
+python ablation_sae_features.py \
+  --config-path=ckpt/arc_v1_public \
+  --config-name=all_config \
+  load_checkpoint=ckpt/arc_v1_public/step_518071 \
+  data_paths="[data/arc1concept-aug-1000]" \
+  data_paths_test="[data/arc1concept-aug-1000]" \
+  global_batch_size=1 \
+  ++sae_model_type=${SAE_MODEL_TYPE} \
+  ++output_dir=${OUTPUT_DIR} \
+  ++ablation_mode=progressive \
+  ++ranking_metric=${RANKING_METRIC} \
+  ++max_k_features=${MAX_K} \
+  ++max_error_changes=${MAX_ERROR_CHANGES} \
+  ++sort_by_iteration=${SORT_BY_ITERATION} \
+  ++answer_only=${ANSWER_ONLY} \
+  ++num_visualize=${NUM_VISUALIZE} \
+  ++puzzle_ids="${PUZZLE_IDS}"
+
+echo "=============================================="
+echo "Progressive Ablation Complete!"
+echo "Results saved to:"
+echo "  - ablation_progressive_${SAE_MODEL_TYPE}_avg_activation/"
+echo "  - ablation_progressive_${SAE_MODEL_TYPE}_activation_freq/"
+echo "=============================================="
+
+# ============================================================================
+# (Commented) Mode: top_k - Ablate top K most active features together
+# ============================================================================
+# SAE_MODEL_TYPE="sae"
+# ABLATION_MODE="top_k"
+# NUM_FEATURES_TO_ABLATE=10
+# SORT_BY_ITERATION=1
+# ANSWER_ONLY=true
+# OUTPUT_DIR="ablation_results_${SAE_MODEL_TYPE}_${ABLATION_MODE}_${NUM_FEATURES_TO_ABLATE}"
+#
+# rm -rf ${OUTPUT_DIR}
+# python ablation_sae_features.py \
+#   --config-path=ckpt/arc_v1_public \
+#   --config-name=all_config \
+#   load_checkpoint=ckpt/arc_v1_public/step_518071 \
+#   data_paths="[data/arc1concept-aug-1000]" \
+#   data_paths_test="[data/arc1concept-aug-1000]" \
+#   global_batch_size=1 \
+#   ++sae_model_type=${SAE_MODEL_TYPE} \
+#   ++output_dir=${OUTPUT_DIR} \
+#   ++ablation_mode=${ABLATION_MODE} \
+#   ++num_features_to_ablate=${NUM_FEATURES_TO_ABLATE} \
+#   ++num_visualize=20 \
+#   ++top_m_features=50 \
+#   ++sort_by_iteration=${SORT_BY_ITERATION} \
+#   ++answer_only=${ANSWER_ONLY} \
+#   ++puzzle_ids="[0,778,1779,2780,3781,4782,5784,6785,6857,7858,8859,9860,10861,11862,12863,13864,14865,15866,16867,17443]"
 
 # ============================================================================
 # Example: Ablate specific features (e.g.,features 100,200,300)
