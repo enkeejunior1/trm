@@ -1,0 +1,2280 @@
+{
+  "config": {
+    "ablation_mode": "specific",
+    "num_features_to_ablate": 10,
+    "sae_model_type": "sae",
+    "answer_only": true,
+    "sort_by_iteration": 1
+  },
+  "statistics": {
+    "total_samples": 20,
+    "original_correct": 9,
+    "ablated_correct": 9,
+    "samples_changed": 1,
+    "original_accuracy": 0.45,
+    "ablated_accuracy": 0.45,
+    "change_rate": 0.05
+  },
+  "results": [
+    {
+      "puzzle_name": "7c9b52a0",
+      "puzzle_id": 362365,
+      "is_correct_original": true,
+      "is_correct_ablated": true,
+      "num_diff_original": 0,
+      "num_diff_ablated": 0,
+      "num_changed_positions": 0,
+      "ablated_features": [
+        2739,
+        3762,
+        1670,
+        6,
+        3601,
+        1584,
+        738,
+        1747,
+        1602,
+        1505,
+        2690,
+        2891,
+        3572,
+        3124,
+        2631,
+        243,
+        1049,
+        3454,
+        628,
+        3804
+      ],
+      "ablation_info": [
+        {
+          "step": 0,
+          "contribution_norm": 121.0,
+          "z_n_sum": 8256.0
+        },
+        {
+          "step": 1,
+          "contribution_norm": 153.0,
+          "z_n_sum": 11392.0
+        },
+        {
+          "step": 2,
+          "contribution_norm": 113.5,
+          "z_n_sum": 7488.0
+        },
+        {
+          "step": 3,
+          "contribution_norm": 118.5,
+          "z_n_sum": 7904.0
+        },
+        {
+          "step": 4,
+          "contribution_norm": 121.0,
+          "z_n_sum": 8256.0
+        },
+        {
+          "step": 5,
+          "contribution_norm": 121.5,
+          "z_n_sum": 8320.0
+        },
+        {
+          "step": 6,
+          "contribution_norm": 122.0,
+          "z_n_sum": 8384.0
+        },
+        {
+          "step": 7,
+          "contribution_norm": 121.5,
+          "z_n_sum": 8320.0
+        },
+        {
+          "step": 8,
+          "contribution_norm": 122.5,
+          "z_n_sum": 8448.0
+        },
+        {
+          "step": 9,
+          "contribution_norm": 122.5,
+          "z_n_sum": 8512.0
+        },
+        {
+          "step": 10,
+          "contribution_norm": 122.5,
+          "z_n_sum": 8512.0
+        },
+        {
+          "step": 11,
+          "contribution_norm": 123.0,
+          "z_n_sum": 8576.0
+        },
+        {
+          "step": 12,
+          "contribution_norm": 123.5,
+          "z_n_sum": 8640.0
+        },
+        {
+          "step": 13,
+          "contribution_norm": 124.0,
+          "z_n_sum": 8768.0
+        },
+        {
+          "step": 14,
+          "contribution_norm": 124.5,
+          "z_n_sum": 8832.0
+        },
+        {
+          "step": 15,
+          "contribution_norm": 125.0,
+          "z_n_sum": 8896.0
+        }
+      ]
+    },
+    {
+      "puzzle_name": "2a5f8217",
+      "puzzle_id": 363143,
+      "is_correct_original": true,
+      "is_correct_ablated": true,
+      "num_diff_original": 0,
+      "num_diff_ablated": 0,
+      "num_changed_positions": 0,
+      "ablated_features": [
+        2739,
+        3762,
+        1670,
+        6,
+        3601,
+        1584,
+        738,
+        1747,
+        1602,
+        1505,
+        2690,
+        2891,
+        3572,
+        3124,
+        2631,
+        243,
+        1049,
+        3454,
+        628,
+        3804
+      ],
+      "ablation_info": [
+        {
+          "step": 0,
+          "contribution_norm": 85.5,
+          "z_n_sum": 4000.0
+        },
+        {
+          "step": 1,
+          "contribution_norm": 140.0,
+          "z_n_sum": 9664.0
+        },
+        {
+          "step": 2,
+          "contribution_norm": 95.5,
+          "z_n_sum": 5344.0
+        },
+        {
+          "step": 3,
+          "contribution_norm": 86.0,
+          "z_n_sum": 4032.0
+        },
+        {
+          "step": 4,
+          "contribution_norm": 92.5,
+          "z_n_sum": 4704.0
+        },
+        {
+          "step": 5,
+          "contribution_norm": 91.0,
+          "z_n_sum": 4544.0
+        },
+        {
+          "step": 6,
+          "contribution_norm": 90.0,
+          "z_n_sum": 4416.0
+        },
+        {
+          "step": 7,
+          "contribution_norm": 90.0,
+          "z_n_sum": 4416.0
+        },
+        {
+          "step": 8,
+          "contribution_norm": 91.0,
+          "z_n_sum": 4512.0
+        },
+        {
+          "step": 9,
+          "contribution_norm": 90.5,
+          "z_n_sum": 4480.0
+        },
+        {
+          "step": 10,
+          "contribution_norm": 90.5,
+          "z_n_sum": 4448.0
+        },
+        {
+          "step": 11,
+          "contribution_norm": 90.5,
+          "z_n_sum": 4480.0
+        },
+        {
+          "step": 12,
+          "contribution_norm": 90.5,
+          "z_n_sum": 4448.0
+        },
+        {
+          "step": 13,
+          "contribution_norm": 90.0,
+          "z_n_sum": 4384.0
+        },
+        {
+          "step": 14,
+          "contribution_norm": 90.5,
+          "z_n_sum": 4480.0
+        },
+        {
+          "step": 15,
+          "contribution_norm": 90.5,
+          "z_n_sum": 4448.0
+        }
+      ]
+    },
+    {
+      "puzzle_name": "477d2879",
+      "puzzle_id": 364144,
+      "is_correct_original": true,
+      "is_correct_ablated": true,
+      "num_diff_original": 0,
+      "num_diff_ablated": 0,
+      "num_changed_positions": 0,
+      "ablated_features": [
+        2739,
+        3762,
+        1670,
+        6,
+        3601,
+        1584,
+        738,
+        1747,
+        1602,
+        1505,
+        2690,
+        2891,
+        3572,
+        3124,
+        2631,
+        243,
+        1049,
+        3454,
+        628,
+        3804
+      ],
+      "ablation_info": [
+        {
+          "step": 0,
+          "contribution_norm": 71.0,
+          "z_n_sum": 3200.0
+        },
+        {
+          "step": 1,
+          "contribution_norm": 77.5,
+          "z_n_sum": 3616.0
+        },
+        {
+          "step": 2,
+          "contribution_norm": 62.0,
+          "z_n_sum": 2464.0
+        },
+        {
+          "step": 3,
+          "contribution_norm": 71.5,
+          "z_n_sum": 3248.0
+        },
+        {
+          "step": 4,
+          "contribution_norm": 67.5,
+          "z_n_sum": 2864.0
+        },
+        {
+          "step": 5,
+          "contribution_norm": 66.5,
+          "z_n_sum": 2784.0
+        },
+        {
+          "step": 6,
+          "contribution_norm": 66.5,
+          "z_n_sum": 2816.0
+        },
+        {
+          "step": 7,
+          "contribution_norm": 67.5,
+          "z_n_sum": 2896.0
+        },
+        {
+          "step": 8,
+          "contribution_norm": 67.5,
+          "z_n_sum": 2864.0
+        },
+        {
+          "step": 9,
+          "contribution_norm": 67.0,
+          "z_n_sum": 2848.0
+        },
+        {
+          "step": 10,
+          "contribution_norm": 67.5,
+          "z_n_sum": 2896.0
+        },
+        {
+          "step": 11,
+          "contribution_norm": 66.5,
+          "z_n_sum": 2816.0
+        },
+        {
+          "step": 12,
+          "contribution_norm": 67.0,
+          "z_n_sum": 2848.0
+        },
+        {
+          "step": 13,
+          "contribution_norm": 67.5,
+          "z_n_sum": 2864.0
+        },
+        {
+          "step": 14,
+          "contribution_norm": 67.5,
+          "z_n_sum": 2864.0
+        },
+        {
+          "step": 15,
+          "contribution_norm": 67.5,
+          "z_n_sum": 2864.0
+        }
+      ]
+    },
+    {
+      "puzzle_name": "b15fca0b",
+      "puzzle_id": 365145,
+      "is_correct_original": false,
+      "is_correct_ablated": false,
+      "num_diff_original": 27,
+      "num_diff_ablated": 27,
+      "num_changed_positions": 0,
+      "ablated_features": [
+        2739,
+        3762,
+        1670,
+        6,
+        3601,
+        1584,
+        738,
+        1747,
+        1602,
+        1505,
+        2690,
+        2891,
+        3572,
+        3124,
+        2631,
+        243,
+        1049,
+        3454,
+        628,
+        3804
+      ],
+      "ablation_info": [
+        {
+          "step": 0,
+          "contribution_norm": 70.0,
+          "z_n_sum": 2384.0
+        },
+        {
+          "step": 1,
+          "contribution_norm": 58.5,
+          "z_n_sum": 1656.0
+        },
+        {
+          "step": 2,
+          "contribution_norm": 66.0,
+          "z_n_sum": 2176.0
+        },
+        {
+          "step": 3,
+          "contribution_norm": 70.0,
+          "z_n_sum": 2368.0
+        },
+        {
+          "step": 4,
+          "contribution_norm": 70.5,
+          "z_n_sum": 2448.0
+        },
+        {
+          "step": 5,
+          "contribution_norm": 70.5,
+          "z_n_sum": 2432.0
+        },
+        {
+          "step": 6,
+          "contribution_norm": 70.0,
+          "z_n_sum": 2432.0
+        },
+        {
+          "step": 7,
+          "contribution_norm": 70.0,
+          "z_n_sum": 2432.0
+        },
+        {
+          "step": 8,
+          "contribution_norm": 70.0,
+          "z_n_sum": 2432.0
+        },
+        {
+          "step": 9,
+          "contribution_norm": 70.0,
+          "z_n_sum": 2432.0
+        },
+        {
+          "step": 10,
+          "contribution_norm": 70.0,
+          "z_n_sum": 2416.0
+        },
+        {
+          "step": 11,
+          "contribution_norm": 70.0,
+          "z_n_sum": 2416.0
+        },
+        {
+          "step": 12,
+          "contribution_norm": 70.0,
+          "z_n_sum": 2448.0
+        },
+        {
+          "step": 13,
+          "contribution_norm": 70.0,
+          "z_n_sum": 2432.0
+        },
+        {
+          "step": 14,
+          "contribution_norm": 70.0,
+          "z_n_sum": 2416.0
+        },
+        {
+          "step": 15,
+          "contribution_norm": 70.0,
+          "z_n_sum": 2432.0
+        }
+      ]
+    },
+    {
+      "puzzle_name": "e5790162",
+      "puzzle_id": 366146,
+      "is_correct_original": false,
+      "is_correct_ablated": false,
+      "num_diff_original": 30,
+      "num_diff_ablated": 30,
+      "num_changed_positions": 0,
+      "ablated_features": [
+        2739,
+        3762,
+        1670,
+        6,
+        3601,
+        1584,
+        738,
+        1747,
+        1602,
+        1505,
+        2690,
+        2891,
+        3572,
+        3124,
+        2631,
+        243,
+        1049,
+        3454,
+        628,
+        3804
+      ],
+      "ablation_info": [
+        {
+          "step": 0,
+          "contribution_norm": 122.5,
+          "z_n_sum": 7776.0
+        },
+        {
+          "step": 1,
+          "contribution_norm": 89.0,
+          "z_n_sum": 4384.0
+        },
+        {
+          "step": 2,
+          "contribution_norm": 124.0,
+          "z_n_sum": 8000.0
+        },
+        {
+          "step": 3,
+          "contribution_norm": 122.5,
+          "z_n_sum": 7776.0
+        },
+        {
+          "step": 4,
+          "contribution_norm": 125.5,
+          "z_n_sum": 8000.0
+        },
+        {
+          "step": 5,
+          "contribution_norm": 127.0,
+          "z_n_sum": 8160.0
+        },
+        {
+          "step": 6,
+          "contribution_norm": 127.0,
+          "z_n_sum": 8128.0
+        },
+        {
+          "step": 7,
+          "contribution_norm": 127.5,
+          "z_n_sum": 8192.0
+        },
+        {
+          "step": 8,
+          "contribution_norm": 129.0,
+          "z_n_sum": 8320.0
+        },
+        {
+          "step": 9,
+          "contribution_norm": 129.0,
+          "z_n_sum": 8320.0
+        },
+        {
+          "step": 10,
+          "contribution_norm": 128.0,
+          "z_n_sum": 8256.0
+        },
+        {
+          "step": 11,
+          "contribution_norm": 129.0,
+          "z_n_sum": 8320.0
+        },
+        {
+          "step": 12,
+          "contribution_norm": 129.0,
+          "z_n_sum": 8320.0
+        },
+        {
+          "step": 13,
+          "contribution_norm": 129.0,
+          "z_n_sum": 8320.0
+        },
+        {
+          "step": 14,
+          "contribution_norm": 129.0,
+          "z_n_sum": 8320.0
+        },
+        {
+          "step": 15,
+          "contribution_norm": 128.0,
+          "z_n_sum": 8256.0
+        }
+      ]
+    },
+    {
+      "puzzle_name": "4364c1c4",
+      "puzzle_id": 367147,
+      "is_correct_original": false,
+      "is_correct_ablated": false,
+      "num_diff_original": 63,
+      "num_diff_ablated": 63,
+      "num_changed_positions": 0,
+      "ablated_features": [
+        2739,
+        3762,
+        1670,
+        6,
+        3601,
+        1584,
+        738,
+        1747,
+        1602,
+        1505,
+        2690,
+        2891,
+        3572,
+        3124,
+        2631,
+        243,
+        1049,
+        3454,
+        628,
+        3804
+      ],
+      "ablation_info": [
+        {
+          "step": 0,
+          "contribution_norm": 90.0,
+          "z_n_sum": 4640.0
+        },
+        {
+          "step": 1,
+          "contribution_norm": 80.5,
+          "z_n_sum": 3152.0
+        },
+        {
+          "step": 2,
+          "contribution_norm": 109.0,
+          "z_n_sum": 6336.0
+        },
+        {
+          "step": 3,
+          "contribution_norm": 87.5,
+          "z_n_sum": 4384.0
+        },
+        {
+          "step": 4,
+          "contribution_norm": 91.5,
+          "z_n_sum": 4576.0
+        },
+        {
+          "step": 5,
+          "contribution_norm": 76.0,
+          "z_n_sum": 3312.0
+        },
+        {
+          "step": 6,
+          "contribution_norm": 82.0,
+          "z_n_sum": 3696.0
+        },
+        {
+          "step": 7,
+          "contribution_norm": 77.0,
+          "z_n_sum": 3312.0
+        },
+        {
+          "step": 8,
+          "contribution_norm": 80.0,
+          "z_n_sum": 3584.0
+        },
+        {
+          "step": 9,
+          "contribution_norm": 78.5,
+          "z_n_sum": 3440.0
+        },
+        {
+          "step": 10,
+          "contribution_norm": 77.0,
+          "z_n_sum": 3360.0
+        },
+        {
+          "step": 11,
+          "contribution_norm": 79.0,
+          "z_n_sum": 3472.0
+        },
+        {
+          "step": 12,
+          "contribution_norm": 77.0,
+          "z_n_sum": 3344.0
+        },
+        {
+          "step": 13,
+          "contribution_norm": 79.0,
+          "z_n_sum": 3488.0
+        },
+        {
+          "step": 14,
+          "contribution_norm": 76.5,
+          "z_n_sum": 3280.0
+        },
+        {
+          "step": 15,
+          "contribution_norm": 78.5,
+          "z_n_sum": 3488.0
+        }
+      ]
+    },
+    {
+      "puzzle_name": "puzzle_368149",
+      "puzzle_id": 368149,
+      "is_correct_original": false,
+      "is_correct_ablated": false,
+      "num_diff_original": 25,
+      "num_diff_ablated": 25,
+      "num_changed_positions": 0,
+      "ablated_features": [
+        2739,
+        3762,
+        1670,
+        6,
+        3601,
+        1584,
+        738,
+        1747,
+        1602,
+        1505,
+        2690,
+        2891,
+        3572,
+        3124,
+        2631,
+        243,
+        1049,
+        3454,
+        628,
+        3804
+      ],
+      "ablation_info": [
+        {
+          "step": 0,
+          "contribution_norm": 82.5,
+          "z_n_sum": 3808.0
+        },
+        {
+          "step": 1,
+          "contribution_norm": 75.0,
+          "z_n_sum": 3184.0
+        },
+        {
+          "step": 2,
+          "contribution_norm": 84.0,
+          "z_n_sum": 3968.0
+        },
+        {
+          "step": 3,
+          "contribution_norm": 82.5,
+          "z_n_sum": 3792.0
+        },
+        {
+          "step": 4,
+          "contribution_norm": 80.5,
+          "z_n_sum": 3632.0
+        },
+        {
+          "step": 5,
+          "contribution_norm": 85.5,
+          "z_n_sum": 4000.0
+        },
+        {
+          "step": 6,
+          "contribution_norm": 84.5,
+          "z_n_sum": 3888.0
+        },
+        {
+          "step": 7,
+          "contribution_norm": 84.5,
+          "z_n_sum": 3904.0
+        },
+        {
+          "step": 8,
+          "contribution_norm": 84.5,
+          "z_n_sum": 3936.0
+        },
+        {
+          "step": 9,
+          "contribution_norm": 84.5,
+          "z_n_sum": 3904.0
+        },
+        {
+          "step": 10,
+          "contribution_norm": 84.0,
+          "z_n_sum": 3888.0
+        },
+        {
+          "step": 11,
+          "contribution_norm": 84.5,
+          "z_n_sum": 3904.0
+        },
+        {
+          "step": 12,
+          "contribution_norm": 84.5,
+          "z_n_sum": 3904.0
+        },
+        {
+          "step": 13,
+          "contribution_norm": 84.5,
+          "z_n_sum": 3904.0
+        },
+        {
+          "step": 14,
+          "contribution_norm": 84.5,
+          "z_n_sum": 3904.0
+        },
+        {
+          "step": 15,
+          "contribution_norm": 84.5,
+          "z_n_sum": 3920.0
+        }
+      ]
+    },
+    {
+      "puzzle_name": "puzzle_369150",
+      "puzzle_id": 369150,
+      "is_correct_original": false,
+      "is_correct_ablated": false,
+      "num_diff_original": 34,
+      "num_diff_ablated": 34,
+      "num_changed_positions": 0,
+      "ablated_features": [
+        2739,
+        3762,
+        1670,
+        6,
+        3601,
+        1584,
+        738,
+        1747,
+        1602,
+        1505,
+        2690,
+        2891,
+        3572,
+        3124,
+        2631,
+        243,
+        1049,
+        3454,
+        628,
+        3804
+      ],
+      "ablation_info": [
+        {
+          "step": 0,
+          "contribution_norm": 91.5,
+          "z_n_sum": 4480.0
+        },
+        {
+          "step": 1,
+          "contribution_norm": 59.75,
+          "z_n_sum": 2144.0
+        },
+        {
+          "step": 2,
+          "contribution_norm": 76.5,
+          "z_n_sum": 3392.0
+        },
+        {
+          "step": 3,
+          "contribution_norm": 92.0,
+          "z_n_sum": 4480.0
+        },
+        {
+          "step": 4,
+          "contribution_norm": 89.5,
+          "z_n_sum": 4288.0
+        },
+        {
+          "step": 5,
+          "contribution_norm": 92.5,
+          "z_n_sum": 4512.0
+        },
+        {
+          "step": 6,
+          "contribution_norm": 62.0,
+          "z_n_sum": 2208.0
+        },
+        {
+          "step": 7,
+          "contribution_norm": 69.0,
+          "z_n_sum": 2688.0
+        },
+        {
+          "step": 8,
+          "contribution_norm": 57.0,
+          "z_n_sum": 1880.0
+        },
+        {
+          "step": 9,
+          "contribution_norm": 50.25,
+          "z_n_sum": 1400.0
+        },
+        {
+          "step": 10,
+          "contribution_norm": 55.25,
+          "z_n_sum": 1688.0
+        },
+        {
+          "step": 11,
+          "contribution_norm": 56.75,
+          "z_n_sum": 1776.0
+        },
+        {
+          "step": 12,
+          "contribution_norm": 56.0,
+          "z_n_sum": 1720.0
+        },
+        {
+          "step": 13,
+          "contribution_norm": 56.25,
+          "z_n_sum": 1736.0
+        },
+        {
+          "step": 14,
+          "contribution_norm": 56.75,
+          "z_n_sum": 1760.0
+        },
+        {
+          "step": 15,
+          "contribution_norm": 56.75,
+          "z_n_sum": 1768.0
+        }
+      ]
+    },
+    {
+      "puzzle_name": "puzzle_369222",
+      "puzzle_id": 369222,
+      "is_correct_original": false,
+      "is_correct_ablated": false,
+      "num_diff_original": 48,
+      "num_diff_ablated": 48,
+      "num_changed_positions": 0,
+      "ablated_features": [
+        2739,
+        3762,
+        1670,
+        6,
+        3601,
+        1584,
+        738,
+        1747,
+        1602,
+        1505,
+        2690,
+        2891,
+        3572,
+        3124,
+        2631,
+        243,
+        1049,
+        3454,
+        628,
+        3804
+      ],
+      "ablation_info": [
+        {
+          "step": 0,
+          "contribution_norm": 61.0,
+          "z_n_sum": 2040.0
+        },
+        {
+          "step": 1,
+          "contribution_norm": 44.0,
+          "z_n_sum": 1152.0
+        },
+        {
+          "step": 2,
+          "contribution_norm": 66.0,
+          "z_n_sum": 2528.0
+        },
+        {
+          "step": 3,
+          "contribution_norm": 60.0,
+          "z_n_sum": 1976.0
+        },
+        {
+          "step": 4,
+          "contribution_norm": 56.25,
+          "z_n_sum": 1848.0
+        },
+        {
+          "step": 5,
+          "contribution_norm": 75.5,
+          "z_n_sum": 3088.0
+        },
+        {
+          "step": 6,
+          "contribution_norm": 74.0,
+          "z_n_sum": 3040.0
+        },
+        {
+          "step": 7,
+          "contribution_norm": 75.0,
+          "z_n_sum": 3104.0
+        },
+        {
+          "step": 8,
+          "contribution_norm": 66.0,
+          "z_n_sum": 2480.0
+        },
+        {
+          "step": 9,
+          "contribution_norm": 76.5,
+          "z_n_sum": 3200.0
+        },
+        {
+          "step": 10,
+          "contribution_norm": 66.0,
+          "z_n_sum": 2464.0
+        },
+        {
+          "step": 11,
+          "contribution_norm": 76.5,
+          "z_n_sum": 3200.0
+        },
+        {
+          "step": 12,
+          "contribution_norm": 67.0,
+          "z_n_sum": 2512.0
+        },
+        {
+          "step": 13,
+          "contribution_norm": 76.5,
+          "z_n_sum": 3184.0
+        },
+        {
+          "step": 14,
+          "contribution_norm": 68.0,
+          "z_n_sum": 2544.0
+        },
+        {
+          "step": 15,
+          "contribution_norm": 76.5,
+          "z_n_sum": 3200.0
+        }
+      ]
+    },
+    {
+      "puzzle_name": "puzzle_370223",
+      "puzzle_id": 370223,
+      "is_correct_original": true,
+      "is_correct_ablated": true,
+      "num_diff_original": 0,
+      "num_diff_ablated": 0,
+      "num_changed_positions": 0,
+      "ablated_features": [
+        2739,
+        3762,
+        1670,
+        6,
+        3601,
+        1584,
+        738,
+        1747,
+        1602,
+        1505,
+        2690,
+        2891,
+        3572,
+        3124,
+        2631,
+        243,
+        1049,
+        3454,
+        628,
+        3804
+      ],
+      "ablation_info": [
+        {
+          "step": 0,
+          "contribution_norm": 126.0,
+          "z_n_sum": 6400.0
+        },
+        {
+          "step": 1,
+          "contribution_norm": 124.5,
+          "z_n_sum": 6496.0
+        },
+        {
+          "step": 2,
+          "contribution_norm": 123.5,
+          "z_n_sum": 6240.0
+        },
+        {
+          "step": 3,
+          "contribution_norm": 126.0,
+          "z_n_sum": 6400.0
+        },
+        {
+          "step": 4,
+          "contribution_norm": 125.5,
+          "z_n_sum": 6336.0
+        },
+        {
+          "step": 5,
+          "contribution_norm": 125.0,
+          "z_n_sum": 6304.0
+        },
+        {
+          "step": 6,
+          "contribution_norm": 124.5,
+          "z_n_sum": 6304.0
+        },
+        {
+          "step": 7,
+          "contribution_norm": 124.5,
+          "z_n_sum": 6272.0
+        },
+        {
+          "step": 8,
+          "contribution_norm": 124.5,
+          "z_n_sum": 6304.0
+        },
+        {
+          "step": 9,
+          "contribution_norm": 124.5,
+          "z_n_sum": 6304.0
+        },
+        {
+          "step": 10,
+          "contribution_norm": 124.5,
+          "z_n_sum": 6304.0
+        },
+        {
+          "step": 11,
+          "contribution_norm": 124.5,
+          "z_n_sum": 6304.0
+        },
+        {
+          "step": 12,
+          "contribution_norm": 124.5,
+          "z_n_sum": 6304.0
+        },
+        {
+          "step": 13,
+          "contribution_norm": 124.5,
+          "z_n_sum": 6304.0
+        },
+        {
+          "step": 14,
+          "contribution_norm": 124.5,
+          "z_n_sum": 6304.0
+        },
+        {
+          "step": 15,
+          "contribution_norm": 124.5,
+          "z_n_sum": 6304.0
+        }
+      ]
+    },
+    {
+      "puzzle_name": "puzzle_371224",
+      "puzzle_id": 371224,
+      "is_correct_original": true,
+      "is_correct_ablated": true,
+      "num_diff_original": 0,
+      "num_diff_ablated": 0,
+      "num_changed_positions": 0,
+      "ablated_features": [
+        2739,
+        3762,
+        1670,
+        6,
+        3601,
+        1584,
+        738,
+        1747,
+        1602,
+        1505,
+        2690,
+        2891,
+        3572,
+        3124,
+        2631,
+        243,
+        1049,
+        3454,
+        628,
+        3804
+      ],
+      "ablation_info": [
+        {
+          "step": 0,
+          "contribution_norm": 43.0,
+          "z_n_sum": 1136.0
+        },
+        {
+          "step": 1,
+          "contribution_norm": 32.25,
+          "z_n_sum": 688.0
+        },
+        {
+          "step": 2,
+          "contribution_norm": 48.75,
+          "z_n_sum": 1360.0
+        },
+        {
+          "step": 3,
+          "contribution_norm": 42.5,
+          "z_n_sum": 1128.0
+        },
+        {
+          "step": 4,
+          "contribution_norm": 44.75,
+          "z_n_sum": 1216.0
+        },
+        {
+          "step": 5,
+          "contribution_norm": 50.0,
+          "z_n_sum": 1424.0
+        },
+        {
+          "step": 6,
+          "contribution_norm": 38.75,
+          "z_n_sum": 976.0
+        },
+        {
+          "step": 7,
+          "contribution_norm": 49.75,
+          "z_n_sum": 1368.0
+        },
+        {
+          "step": 8,
+          "contribution_norm": 34.75,
+          "z_n_sum": 768.0
+        },
+        {
+          "step": 9,
+          "contribution_norm": 46.0,
+          "z_n_sum": 1248.0
+        },
+        {
+          "step": 10,
+          "contribution_norm": 48.5,
+          "z_n_sum": 1368.0
+        },
+        {
+          "step": 11,
+          "contribution_norm": 39.25,
+          "z_n_sum": 1000.0
+        },
+        {
+          "step": 12,
+          "contribution_norm": 50.0,
+          "z_n_sum": 1376.0
+        },
+        {
+          "step": 13,
+          "contribution_norm": 34.5,
+          "z_n_sum": 760.0
+        },
+        {
+          "step": 14,
+          "contribution_norm": 46.0,
+          "z_n_sum": 1248.0
+        },
+        {
+          "step": 15,
+          "contribution_norm": 48.5,
+          "z_n_sum": 1368.0
+        }
+      ]
+    },
+    {
+      "puzzle_name": "puzzle_372225",
+      "puzzle_id": 372225,
+      "is_correct_original": false,
+      "is_correct_ablated": false,
+      "num_diff_original": 11,
+      "num_diff_ablated": 11,
+      "num_changed_positions": 0,
+      "ablated_features": [
+        2739,
+        3762,
+        1670,
+        6,
+        3601,
+        1584,
+        738,
+        1747,
+        1602,
+        1505,
+        2690,
+        2891,
+        3572,
+        3124,
+        2631,
+        243,
+        1049,
+        3454,
+        628,
+        3804
+      ],
+      "ablation_info": [
+        {
+          "step": 0,
+          "contribution_norm": 104.0,
+          "z_n_sum": 6080.0
+        },
+        {
+          "step": 1,
+          "contribution_norm": 63.0,
+          "z_n_sum": 2272.0
+        },
+        {
+          "step": 2,
+          "contribution_norm": 89.5,
+          "z_n_sum": 4640.0
+        },
+        {
+          "step": 3,
+          "contribution_norm": 103.0,
+          "z_n_sum": 5984.0
+        },
+        {
+          "step": 4,
+          "contribution_norm": 98.0,
+          "z_n_sum": 5440.0
+        },
+        {
+          "step": 5,
+          "contribution_norm": 95.0,
+          "z_n_sum": 5152.0
+        },
+        {
+          "step": 6,
+          "contribution_norm": 91.0,
+          "z_n_sum": 4768.0
+        },
+        {
+          "step": 7,
+          "contribution_norm": 90.0,
+          "z_n_sum": 4672.0
+        },
+        {
+          "step": 8,
+          "contribution_norm": 90.5,
+          "z_n_sum": 4704.0
+        },
+        {
+          "step": 9,
+          "contribution_norm": 91.0,
+          "z_n_sum": 4736.0
+        },
+        {
+          "step": 10,
+          "contribution_norm": 91.0,
+          "z_n_sum": 4736.0
+        },
+        {
+          "step": 11,
+          "contribution_norm": 91.0,
+          "z_n_sum": 4736.0
+        },
+        {
+          "step": 12,
+          "contribution_norm": 91.0,
+          "z_n_sum": 4736.0
+        },
+        {
+          "step": 13,
+          "contribution_norm": 91.0,
+          "z_n_sum": 4768.0
+        },
+        {
+          "step": 14,
+          "contribution_norm": 91.0,
+          "z_n_sum": 4768.0
+        },
+        {
+          "step": 15,
+          "contribution_norm": 91.0,
+          "z_n_sum": 4768.0
+        }
+      ]
+    },
+    {
+      "puzzle_name": "puzzle_373226",
+      "puzzle_id": 373226,
+      "is_correct_original": false,
+      "is_correct_ablated": false,
+      "num_diff_original": 36,
+      "num_diff_ablated": 36,
+      "num_changed_positions": 0,
+      "ablated_features": [
+        2739,
+        3762,
+        1670,
+        6,
+        3601,
+        1584,
+        738,
+        1747,
+        1602,
+        1505,
+        2690,
+        2891,
+        3572,
+        3124,
+        2631,
+        243,
+        1049,
+        3454,
+        628,
+        3804
+      ],
+      "ablation_info": [
+        {
+          "step": 0,
+          "contribution_norm": 100.0,
+          "z_n_sum": 5536.0
+        },
+        {
+          "step": 1,
+          "contribution_norm": 88.5,
+          "z_n_sum": 4384.0
+        },
+        {
+          "step": 2,
+          "contribution_norm": 82.5,
+          "z_n_sum": 4048.0
+        },
+        {
+          "step": 3,
+          "contribution_norm": 99.5,
+          "z_n_sum": 5504.0
+        },
+        {
+          "step": 4,
+          "contribution_norm": 101.5,
+          "z_n_sum": 5600.0
+        },
+        {
+          "step": 5,
+          "contribution_norm": 96.5,
+          "z_n_sum": 5152.0
+        },
+        {
+          "step": 6,
+          "contribution_norm": 75.0,
+          "z_n_sum": 3216.0
+        },
+        {
+          "step": 7,
+          "contribution_norm": 82.5,
+          "z_n_sum": 3696.0
+        },
+        {
+          "step": 8,
+          "contribution_norm": 80.5,
+          "z_n_sum": 3520.0
+        },
+        {
+          "step": 9,
+          "contribution_norm": 80.0,
+          "z_n_sum": 3472.0
+        },
+        {
+          "step": 10,
+          "contribution_norm": 80.5,
+          "z_n_sum": 3504.0
+        },
+        {
+          "step": 11,
+          "contribution_norm": 80.0,
+          "z_n_sum": 3488.0
+        },
+        {
+          "step": 12,
+          "contribution_norm": 80.0,
+          "z_n_sum": 3488.0
+        },
+        {
+          "step": 13,
+          "contribution_norm": 80.5,
+          "z_n_sum": 3504.0
+        },
+        {
+          "step": 14,
+          "contribution_norm": 80.0,
+          "z_n_sum": 3488.0
+        },
+        {
+          "step": 15,
+          "contribution_norm": 80.5,
+          "z_n_sum": 3504.0
+        }
+      ]
+    },
+    {
+      "puzzle_name": "puzzle_374227",
+      "puzzle_id": 374227,
+      "is_correct_original": true,
+      "is_correct_ablated": true,
+      "num_diff_original": 0,
+      "num_diff_ablated": 0,
+      "num_changed_positions": 0,
+      "ablated_features": [
+        2739,
+        3762,
+        1670,
+        6,
+        3601,
+        1584,
+        738,
+        1747,
+        1602,
+        1505,
+        2690,
+        2891,
+        3572,
+        3124,
+        2631,
+        243,
+        1049,
+        3454,
+        628,
+        3804
+      ],
+      "ablation_info": [
+        {
+          "step": 0,
+          "contribution_norm": 91.5,
+          "z_n_sum": 4640.0
+        },
+        {
+          "step": 1,
+          "contribution_norm": 70.5,
+          "z_n_sum": 2912.0
+        },
+        {
+          "step": 2,
+          "contribution_norm": 89.5,
+          "z_n_sum": 4480.0
+        },
+        {
+          "step": 3,
+          "contribution_norm": 92.0,
+          "z_n_sum": 4672.0
+        },
+        {
+          "step": 4,
+          "contribution_norm": 92.0,
+          "z_n_sum": 4768.0
+        },
+        {
+          "step": 5,
+          "contribution_norm": 91.5,
+          "z_n_sum": 4672.0
+        },
+        {
+          "step": 6,
+          "contribution_norm": 91.0,
+          "z_n_sum": 4608.0
+        },
+        {
+          "step": 7,
+          "contribution_norm": 91.0,
+          "z_n_sum": 4608.0
+        },
+        {
+          "step": 8,
+          "contribution_norm": 90.5,
+          "z_n_sum": 4576.0
+        },
+        {
+          "step": 9,
+          "contribution_norm": 90.5,
+          "z_n_sum": 4576.0
+        },
+        {
+          "step": 10,
+          "contribution_norm": 90.5,
+          "z_n_sum": 4544.0
+        },
+        {
+          "step": 11,
+          "contribution_norm": 91.0,
+          "z_n_sum": 4576.0
+        },
+        {
+          "step": 12,
+          "contribution_norm": 90.5,
+          "z_n_sum": 4512.0
+        },
+        {
+          "step": 13,
+          "contribution_norm": 90.5,
+          "z_n_sum": 4544.0
+        },
+        {
+          "step": 14,
+          "contribution_norm": 90.5,
+          "z_n_sum": 4544.0
+        },
+        {
+          "step": 15,
+          "contribution_norm": 90.5,
+          "z_n_sum": 4576.0
+        }
+      ]
+    },
+    {
+      "puzzle_name": "puzzle_375228",
+      "puzzle_id": 375228,
+      "is_correct_original": false,
+      "is_correct_ablated": false,
+      "num_diff_original": 23,
+      "num_diff_ablated": 23,
+      "num_changed_positions": 0,
+      "ablated_features": [
+        2739,
+        3762,
+        1670,
+        6,
+        3601,
+        1584,
+        738,
+        1747,
+        1602,
+        1505,
+        2690,
+        2891,
+        3572,
+        3124,
+        2631,
+        243,
+        1049,
+        3454,
+        628,
+        3804
+      ],
+      "ablation_info": [
+        {
+          "step": 0,
+          "contribution_norm": 105.5,
+          "z_n_sum": 6144.0
+        },
+        {
+          "step": 1,
+          "contribution_norm": 52.25,
+          "z_n_sum": 1616.0
+        },
+        {
+          "step": 2,
+          "contribution_norm": 97.0,
+          "z_n_sum": 5408.0
+        },
+        {
+          "step": 3,
+          "contribution_norm": 106.0,
+          "z_n_sum": 6144.0
+        },
+        {
+          "step": 4,
+          "contribution_norm": 104.0,
+          "z_n_sum": 5888.0
+        },
+        {
+          "step": 5,
+          "contribution_norm": 103.5,
+          "z_n_sum": 5856.0
+        },
+        {
+          "step": 6,
+          "contribution_norm": 103.5,
+          "z_n_sum": 5856.0
+        },
+        {
+          "step": 7,
+          "contribution_norm": 104.0,
+          "z_n_sum": 5888.0
+        },
+        {
+          "step": 8,
+          "contribution_norm": 103.5,
+          "z_n_sum": 5856.0
+        },
+        {
+          "step": 9,
+          "contribution_norm": 103.5,
+          "z_n_sum": 5824.0
+        },
+        {
+          "step": 10,
+          "contribution_norm": 103.5,
+          "z_n_sum": 5824.0
+        },
+        {
+          "step": 11,
+          "contribution_norm": 103.0,
+          "z_n_sum": 5792.0
+        },
+        {
+          "step": 12,
+          "contribution_norm": 103.5,
+          "z_n_sum": 5792.0
+        },
+        {
+          "step": 13,
+          "contribution_norm": 103.0,
+          "z_n_sum": 5760.0
+        },
+        {
+          "step": 14,
+          "contribution_norm": 103.0,
+          "z_n_sum": 5760.0
+        },
+        {
+          "step": 15,
+          "contribution_norm": 103.0,
+          "z_n_sum": 5760.0
+        }
+      ]
+    },
+    {
+      "puzzle_name": "puzzle_376229",
+      "puzzle_id": 376229,
+      "is_correct_original": false,
+      "is_correct_ablated": false,
+      "num_diff_original": 15,
+      "num_diff_ablated": 15,
+      "num_changed_positions": 0,
+      "ablated_features": [
+        2739,
+        3762,
+        1670,
+        6,
+        3601,
+        1584,
+        738,
+        1747,
+        1602,
+        1505,
+        2690,
+        2891,
+        3572,
+        3124,
+        2631,
+        243,
+        1049,
+        3454,
+        628,
+        3804
+      ],
+      "ablation_info": [
+        {
+          "step": 0,
+          "contribution_norm": 112.5,
+          "z_n_sum": 6848.0
+        },
+        {
+          "step": 1,
+          "contribution_norm": 63.75,
+          "z_n_sum": 2480.0
+        },
+        {
+          "step": 2,
+          "contribution_norm": 92.5,
+          "z_n_sum": 4832.0
+        },
+        {
+          "step": 3,
+          "contribution_norm": 112.5,
+          "z_n_sum": 6816.0
+        },
+        {
+          "step": 4,
+          "contribution_norm": 112.0,
+          "z_n_sum": 6848.0
+        },
+        {
+          "step": 5,
+          "contribution_norm": 112.0,
+          "z_n_sum": 6848.0
+        },
+        {
+          "step": 6,
+          "contribution_norm": 114.0,
+          "z_n_sum": 7008.0
+        },
+        {
+          "step": 7,
+          "contribution_norm": 116.0,
+          "z_n_sum": 7232.0
+        },
+        {
+          "step": 8,
+          "contribution_norm": 117.0,
+          "z_n_sum": 7296.0
+        },
+        {
+          "step": 9,
+          "contribution_norm": 117.5,
+          "z_n_sum": 7392.0
+        },
+        {
+          "step": 10,
+          "contribution_norm": 118.0,
+          "z_n_sum": 7392.0
+        },
+        {
+          "step": 11,
+          "contribution_norm": 117.5,
+          "z_n_sum": 7360.0
+        },
+        {
+          "step": 12,
+          "contribution_norm": 117.0,
+          "z_n_sum": 7328.0
+        },
+        {
+          "step": 13,
+          "contribution_norm": 117.5,
+          "z_n_sum": 7360.0
+        },
+        {
+          "step": 14,
+          "contribution_norm": 117.0,
+          "z_n_sum": 7328.0
+        },
+        {
+          "step": 15,
+          "contribution_norm": 117.0,
+          "z_n_sum": 7296.0
+        }
+      ]
+    },
+    {
+      "puzzle_name": "puzzle_377230",
+      "puzzle_id": 377230,
+      "is_correct_original": true,
+      "is_correct_ablated": true,
+      "num_diff_original": 0,
+      "num_diff_ablated": 0,
+      "num_changed_positions": 0,
+      "ablated_features": [
+        2739,
+        3762,
+        1670,
+        6,
+        3601,
+        1584,
+        738,
+        1747,
+        1602,
+        1505,
+        2690,
+        2891,
+        3572,
+        3124,
+        2631,
+        243,
+        1049,
+        3454,
+        628,
+        3804
+      ],
+      "ablation_info": [
+        {
+          "step": 0,
+          "contribution_norm": 82.5,
+          "z_n_sum": 3600.0
+        },
+        {
+          "step": 1,
+          "contribution_norm": 124.0,
+          "z_n_sum": 7552.0
+        },
+        {
+          "step": 2,
+          "contribution_norm": 79.0,
+          "z_n_sum": 3392.0
+        },
+        {
+          "step": 3,
+          "contribution_norm": 82.5,
+          "z_n_sum": 3600.0
+        },
+        {
+          "step": 4,
+          "contribution_norm": 87.5,
+          "z_n_sum": 4080.0
+        },
+        {
+          "step": 5,
+          "contribution_norm": 88.0,
+          "z_n_sum": 4160.0
+        },
+        {
+          "step": 6,
+          "contribution_norm": 88.0,
+          "z_n_sum": 4128.0
+        },
+        {
+          "step": 7,
+          "contribution_norm": 87.0,
+          "z_n_sum": 4064.0
+        },
+        {
+          "step": 8,
+          "contribution_norm": 87.5,
+          "z_n_sum": 4080.0
+        },
+        {
+          "step": 9,
+          "contribution_norm": 87.0,
+          "z_n_sum": 4064.0
+        },
+        {
+          "step": 10,
+          "contribution_norm": 87.0,
+          "z_n_sum": 4048.0
+        },
+        {
+          "step": 11,
+          "contribution_norm": 87.0,
+          "z_n_sum": 4064.0
+        },
+        {
+          "step": 12,
+          "contribution_norm": 87.0,
+          "z_n_sum": 4064.0
+        },
+        {
+          "step": 13,
+          "contribution_norm": 87.0,
+          "z_n_sum": 4064.0
+        },
+        {
+          "step": 14,
+          "contribution_norm": 87.5,
+          "z_n_sum": 4080.0
+        },
+        {
+          "step": 15,
+          "contribution_norm": 87.0,
+          "z_n_sum": 4080.0
+        }
+      ]
+    },
+    {
+      "puzzle_name": "puzzle_378231",
+      "puzzle_id": 378231,
+      "is_correct_original": false,
+      "is_correct_ablated": false,
+      "num_diff_original": 83,
+      "num_diff_ablated": 83,
+      "num_changed_positions": 2,
+      "ablated_features": [
+        2739,
+        3762,
+        1670,
+        6,
+        3601,
+        1584,
+        738,
+        1747,
+        1602,
+        1505,
+        2690,
+        2891,
+        3572,
+        3124,
+        2631,
+        243,
+        1049,
+        3454,
+        628,
+        3804
+      ],
+      "ablation_info": [
+        {
+          "step": 0,
+          "contribution_norm": 59.5,
+          "z_n_sum": 2192.0
+        },
+        {
+          "step": 1,
+          "contribution_norm": 55.0,
+          "z_n_sum": 1864.0
+        },
+        {
+          "step": 2,
+          "contribution_norm": 55.5,
+          "z_n_sum": 1936.0
+        },
+        {
+          "step": 3,
+          "contribution_norm": 60.0,
+          "z_n_sum": 2224.0
+        },
+        {
+          "step": 4,
+          "contribution_norm": 55.25,
+          "z_n_sum": 1904.0
+        },
+        {
+          "step": 5,
+          "contribution_norm": 53.75,
+          "z_n_sum": 1792.0
+        },
+        {
+          "step": 6,
+          "contribution_norm": 52.75,
+          "z_n_sum": 1736.0
+        },
+        {
+          "step": 7,
+          "contribution_norm": 52.5,
+          "z_n_sum": 1704.0
+        },
+        {
+          "step": 8,
+          "contribution_norm": 52.0,
+          "z_n_sum": 1664.0
+        },
+        {
+          "step": 9,
+          "contribution_norm": 52.0,
+          "z_n_sum": 1656.0
+        },
+        {
+          "step": 10,
+          "contribution_norm": 52.0,
+          "z_n_sum": 1664.0
+        },
+        {
+          "step": 11,
+          "contribution_norm": 52.0,
+          "z_n_sum": 1656.0
+        },
+        {
+          "step": 12,
+          "contribution_norm": 52.0,
+          "z_n_sum": 1648.0
+        },
+        {
+          "step": 13,
+          "contribution_norm": 51.75,
+          "z_n_sum": 1640.0
+        },
+        {
+          "step": 14,
+          "contribution_norm": 51.75,
+          "z_n_sum": 1640.0
+        },
+        {
+          "step": 15,
+          "contribution_norm": 51.5,
+          "z_n_sum": 1624.0
+        }
+      ]
+    },
+    {
+      "puzzle_name": "puzzle_379232",
+      "puzzle_id": 379232,
+      "is_correct_original": true,
+      "is_correct_ablated": true,
+      "num_diff_original": 0,
+      "num_diff_ablated": 0,
+      "num_changed_positions": 0,
+      "ablated_features": [
+        2739,
+        3762,
+        1670,
+        6,
+        3601,
+        1584,
+        738,
+        1747,
+        1602,
+        1505,
+        2690,
+        2891,
+        3572,
+        3124,
+        2631,
+        243,
+        1049,
+        3454,
+        628,
+        3804
+      ],
+      "ablation_info": [
+        {
+          "step": 0,
+          "contribution_norm": 28.625,
+          "z_n_sum": 528.0
+        },
+        {
+          "step": 1,
+          "contribution_norm": 37.5,
+          "z_n_sum": 808.0
+        },
+        {
+          "step": 2,
+          "contribution_norm": 18.375,
+          "z_n_sum": 207.0
+        },
+        {
+          "step": 3,
+          "contribution_norm": 28.5,
+          "z_n_sum": 520.0
+        },
+        {
+          "step": 4,
+          "contribution_norm": 16.375,
+          "z_n_sum": 162.0
+        },
+        {
+          "step": 5,
+          "contribution_norm": 20.75,
+          "z_n_sum": 260.0
+        },
+        {
+          "step": 6,
+          "contribution_norm": 24.5,
+          "z_n_sum": 364.0
+        },
+        {
+          "step": 7,
+          "contribution_norm": 20.5,
+          "z_n_sum": 250.0
+        },
+        {
+          "step": 8,
+          "contribution_norm": 18.0,
+          "z_n_sum": 193.0
+        },
+        {
+          "step": 9,
+          "contribution_norm": 16.5,
+          "z_n_sum": 167.0
+        },
+        {
+          "step": 10,
+          "contribution_norm": 16.375,
+          "z_n_sum": 165.0
+        },
+        {
+          "step": 11,
+          "contribution_norm": 16.625,
+          "z_n_sum": 170.0
+        },
+        {
+          "step": 12,
+          "contribution_norm": 16.625,
+          "z_n_sum": 172.0
+        },
+        {
+          "step": 13,
+          "contribution_norm": 18.0,
+          "z_n_sum": 204.0
+        },
+        {
+          "step": 14,
+          "contribution_norm": 17.0,
+          "z_n_sum": 179.0
+        },
+        {
+          "step": 15,
+          "contribution_norm": 16.25,
+          "z_n_sum": 162.0
+        }
+      ]
+    },
+    {
+      "puzzle_name": "puzzle_379808",
+      "puzzle_id": 379808,
+      "is_correct_original": true,
+      "is_correct_ablated": true,
+      "num_diff_original": 0,
+      "num_diff_ablated": 0,
+      "num_changed_positions": 0,
+      "ablated_features": [
+        2739,
+        3762,
+        1670,
+        6,
+        3601,
+        1584,
+        738,
+        1747,
+        1602,
+        1505,
+        2690,
+        2891,
+        3572,
+        3124,
+        2631,
+        243,
+        1049,
+        3454,
+        628,
+        3804
+      ],
+      "ablation_info": [
+        {
+          "step": 0,
+          "contribution_norm": 40.75,
+          "z_n_sum": 1048.0
+        },
+        {
+          "step": 1,
+          "contribution_norm": 44.5,
+          "z_n_sum": 1256.0
+        },
+        {
+          "step": 2,
+          "contribution_norm": 52.5,
+          "z_n_sum": 1592.0
+        },
+        {
+          "step": 3,
+          "contribution_norm": 40.75,
+          "z_n_sum": 1048.0
+        },
+        {
+          "step": 4,
+          "contribution_norm": 37.5,
+          "z_n_sum": 844.0
+        },
+        {
+          "step": 5,
+          "contribution_norm": 47.0,
+          "z_n_sum": 1264.0
+        },
+        {
+          "step": 6,
+          "contribution_norm": 53.75,
+          "z_n_sum": 1736.0
+        },
+        {
+          "step": 7,
+          "contribution_norm": 51.5,
+          "z_n_sum": 1552.0
+        },
+        {
+          "step": 8,
+          "contribution_norm": 61.0,
+          "z_n_sum": 2080.0
+        },
+        {
+          "step": 9,
+          "contribution_norm": 62.25,
+          "z_n_sum": 2144.0
+        },
+        {
+          "step": 10,
+          "contribution_norm": 54.0,
+          "z_n_sum": 1664.0
+        },
+        {
+          "step": 11,
+          "contribution_norm": 43.5,
+          "z_n_sum": 1208.0
+        },
+        {
+          "step": 12,
+          "contribution_norm": 28.375,
+          "z_n_sum": 506.0
+        },
+        {
+          "step": 13,
+          "contribution_norm": 30.875,
+          "z_n_sum": 604.0
+        },
+        {
+          "step": 14,
+          "contribution_norm": 39.5,
+          "z_n_sum": 1000.0
+        },
+        {
+          "step": 15,
+          "contribution_norm": 46.75,
+          "z_n_sum": 1400.0
+        }
+      ]
+    }
+  ]
+}
