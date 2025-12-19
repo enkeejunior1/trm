@@ -327,6 +327,8 @@ class AblationConfig(pydantic.BaseModel):
     ranking_metric: str = "avg_activation"  # "avg_activation" or "activation_freq"
     max_k_features: int = 20  # Maximum K to test in progressive mode
     max_error_changes: int = 0  # Stop after N error changes (0 = no limit, run all K)
+    ablation_step: int = 1  # Ablate in groups of N features (1 = one by one, 10 = groups of 10)
+    save_all_images: bool = False  # Save images for all K (not just when errors change)
     
     # For all_individually mode
     only_active_features: bool = True  # Only test features that are active for this sample
@@ -1105,7 +1107,8 @@ def visualize_progressive_ablation(
     color_curr = '#2ECC40' if is_correct_curr else '#FF4136'
     visualize_grid(pred_curr_grid, axes[4], f"K={k_curr} Pred\n{status_curr}", highlight_color=color_curr)
     
-    plt.suptitle(f"{puzzle_name} | Errors: {num_diff_prev} → {num_diff_curr} | +Feature {new_feature}", 
+    feature_info = f"+Feature {new_feature}" if new_feature >= 0 else f"+Features {k_prev+1}~{k_curr}"
+    plt.suptitle(f"{puzzle_name} | K={k_prev}→{k_curr} | Errors: {num_diff_prev}→{num_diff_curr} | {feature_info}", 
                  fontsize=14, fontweight='bold')
     plt.tight_layout(rect=[0, 0, 1, 0.92])
     
@@ -1167,6 +1170,21 @@ def run_progressive_ablation(
     ranked_indices, metric_values = rank_features_by_metric(sae_features, labels, config)
     max_k = min(config.max_k_features, len(ranked_indices))
     
+    # Debug: Check answer mask
+    D, L, M = sae_features.shape
+    answer_mask = (labels != IGNORE_LABEL_ID)
+    if len(answer_mask) > L:
+        answer_mask = answer_mask[:L]
+    elif len(answer_mask) < L:
+        answer_mask = np.pad(answer_mask, (0, L - len(answer_mask)), constant_values=False)
+    num_answer_tokens = answer_mask.sum()
+    
+    # Debug: Feature stats
+    total_activation = sae_features.sum()
+    answer_activation = (sae_features * answer_mask[None, :, None]).sum() if config.answer_only else total_activation
+    
+    print(f"    answer_only={config.answer_only}, num_answer_tokens={num_answer_tokens}/{L}")
+    print(f"    Total feature activation: {total_activation:.2f}, Answer-only: {answer_activation:.2f}")
     print(f"    Ranking features by: {config.ranking_metric}")
     print(f"    Top 10 features: {list(ranked_indices[:10])}")
     print(f"    Top 10 metric values: {[f'{metric_values[i]:.2f}' for i in ranked_indices[:10]]}")
@@ -1217,14 +1235,17 @@ def run_progressive_ablation(
     plt.close()
     print(f"    Saved original prediction visualization: {orig_filename}")
     
-    # Progressive ablation: K=1, 2, 3, ..., max_k
-    for k in range(1, max_k + 1):
+    # Progressive ablation with step size
+    step = config.ablation_step
+    for k in range(step, max_k + 1, step):
         # Get top-k features to ablate
         features_to_ablate = list(ranked_indices[:k])
-        new_feature = int(ranked_indices[k-1])  # The newly added feature
+        # New features added in this step (from k-step+1 to k)
+        new_features = [int(ranked_indices[i]) for i in range(max(0, k-step), k)]
+        new_feature_str = f"{new_features[0]}" if len(new_features) == 1 else f"{new_features[0]}~{new_features[-1]}"
         
         # Run ablation
-        _, preds_abl, _ = collect_trajectories_with_intervention(
+        _, preds_abl, ablation_info = collect_trajectories_with_intervention(
             model, batch_float, sae,
             ablate_features=features_to_ablate,
             ablate_iterations=config.ablation_iterations,
@@ -1232,6 +1253,9 @@ def run_progressive_ablation(
         )
         
         curr_preds = preds_abl["preds"].cpu().numpy()[0] if preds_abl and "preds" in preds_abl else labels
+        
+        # Compute ablation contribution (for debugging)
+        total_contribution = sum(info.get('contribution_norm', 0) for info in ablation_info) if ablation_info else 0
         
         # Compute accuracy
         curr_pred_grid = decode_arc_grid(curr_preds)
@@ -1245,21 +1269,22 @@ def run_progressive_ablation(
         k_result = {
             'k': int(k),
             'ablated_features': [int(f) for f in features_to_ablate],
-            'new_feature': int(new_feature),
-            'new_feature_metric': float(metric_values[new_feature]),
+            'new_features': new_features,
             'is_correct': bool(is_correct_curr),
             'num_diff': int(curr_num_diff),
             'error_count_changed': bool(error_count_changed),
+            'contribution_norm': float(total_contribution),
         }
         all_k_results.append(k_result)
         
-        # Status indicator
+        # Status indicator with contribution info
         change_marker = f" *ERRORS CHANGED: {prev_num_diff}→{curr_num_diff}*" if error_count_changed else ""
-        print(f"    K={k}: {'✓' if is_correct_curr else '✗'} ({curr_num_diff} errors) [+feat {new_feature}]{change_marker}")
+        print(f"    K={k}: {'✓' if is_correct_curr else '✗'} ({curr_num_diff} errors) [+feat {new_feature_str}] contrib={total_contribution:.2f}{change_marker}")
         
-        # Save visualization ONLY if number of errors changed
-        if error_count_changed:
-            filename = f"k{prev_k:02d}_to_k{k:02d}_feat{new_feature:04d}.png"
+        # Save visualization: all images OR only when errors changed
+        should_save = config.save_all_images or error_count_changed
+        if should_save:
+            filename = f"k{prev_k:04d}_to_k{k:04d}.png"
             output_path = os.path.join(puzzle_dir, filename)
             
             viz_result = visualize_progressive_ablation(
@@ -1270,17 +1295,19 @@ def run_progressive_ablation(
                 pred_curr=curr_preds,
                 k_prev=prev_k,
                 k_curr=k,
-                new_feature=new_feature,
+                new_feature=new_features[0] if len(new_features) == 1 else -1,
                 puzzle_name=puzzle_name,
                 puzzle_id=puzzle_id,
                 output_path=output_path,
             )
             change_visualizations.append(viz_result)
             
-            # Stop if we've reached max_error_changes
-            if config.max_error_changes > 0 and len(change_visualizations) >= config.max_error_changes:
-                print(f"    Reached max_error_changes={config.max_error_changes}, stopping.")
-                break
+            # Stop if we've reached max_error_changes (only counts actual changes)
+            if config.max_error_changes > 0 and error_count_changed:
+                actual_changes = sum(1 for v in change_visualizations if v.get('num_diff_prev') != v.get('num_diff_curr'))
+                if actual_changes >= config.max_error_changes:
+                    print(f"    Reached max_error_changes={config.max_error_changes}, stopping.")
+                    break
         
         # ALWAYS update previous state to compare K with K-1
         prev_preds = curr_preds.copy()
@@ -1340,6 +1367,8 @@ def main(hydra_config: DictConfig):
         ranking_metric=hydra_config.get('ranking_metric', 'avg_activation'),
         max_k_features=hydra_config.get('max_k_features', 20),
         max_error_changes=hydra_config.get('max_error_changes', 0),
+        ablation_step=hydra_config.get('ablation_step', 1),
+        save_all_images=hydra_config.get('save_all_images', False),
         only_active_features=hydra_config.get('only_active_features', True),
         save_only_on_change=hydra_config.get('save_only_on_change', True),
         puzzle_ids=list(hydra_config.get('puzzle_ids', [])) if hydra_config.get('puzzle_ids') else None,
@@ -1362,6 +1391,7 @@ def main(hydra_config: DictConfig):
     elif config.ablation_mode == "progressive":
         print(f"  - Ranking Metric: {config.ranking_metric}")
         print(f"  - Max K Features: {config.max_k_features}")
+        print(f"  - Ablation Step: {config.ablation_step} (group size)")
         print(f"  - Max Error Changes: {config.max_error_changes} (0=no limit)")
         print(f"  - Sort by Iteration: {config.sort_by_iteration}")
         print(f"  - Answer Only: {config.answer_only}")
