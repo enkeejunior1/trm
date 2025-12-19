@@ -164,13 +164,15 @@ class SAE(nn.Module):
         
         return contribution
 
-    def ablate_features(self, zL, feature_indices: List[int]):
+    def ablate_features(self, zL, feature_indices: List[int], method: str = "subtract"):
         """
-        Ablate specific features by subtracting their contribution from zL.
+        Ablate specific features.
         
         Args:
             zL: [B, D, L, H] hidden states
             feature_indices: list of feature indices to ablate
+            method: "subtract" = remove contribution from zL
+                    "reconstruct" = use SAE reconstruction with features zeroed
         
         Returns:
             zL_ablated: [B, D, L, H] hidden states with features ablated
@@ -180,11 +182,26 @@ class SAE(nn.Module):
         # Get sparse features
         z_n = self.encode(zL)
         
-        # Compute contribution of features to ablate
-        contribution = self.compute_feature_contribution(z_n, feature_indices)
-        
-        # Ablate by subtracting contribution
-        zL_ablated = zL - contribution
+        if method == "subtract":
+            # Original method: subtract contribution from zL
+            contribution = self.compute_feature_contribution(z_n, feature_indices)
+            zL_ablated = zL - contribution
+        elif method == "reconstruct":
+            # New method: zero out features and use SAE reconstruction only
+            # Create mask to zero out specified features
+            mask = torch.ones(self.n_features, device=z_n.device, dtype=z_n.dtype)
+            mask[feature_indices] = 0.0
+            
+            # Zero out the features
+            z_n_ablated = z_n * mask[None, None, None, :]
+            
+            # Decode to get reconstruction (this replaces zL entirely)
+            zL_ablated = self.decode(z_n_ablated)
+            
+            # Contribution is what we removed
+            contribution = self.compute_feature_contribution(z_n, feature_indices)
+        else:
+            raise ValueError(f"Unknown ablation method: {method}")
         
         return zL_ablated, z_n, contribution
 
@@ -286,12 +303,34 @@ class TSAE(nn.Module):
         contribution = self.decode(z_n_selected)
         return contribution
 
-    def ablate_features(self, zL, feature_indices: List[int]):
-        """Ablate specific features"""
+    def ablate_features(self, zL, feature_indices: List[int], method: str = "subtract"):
+        """
+        Ablate specific features.
+        
+        Args:
+            zL: [B, D, L, H] hidden states
+            feature_indices: list of feature indices to ablate
+            method: "subtract" = remove contribution from zL
+                    "reconstruct" = use SAE reconstruction with features zeroed
+        """
         z_n, x_prior = self.encode(zL)
-        contribution = self.compute_feature_contribution(z_n, feature_indices)
-        # For TSAE, the features encode the residual, so we subtract from the residual
-        zL_ablated = zL - contribution
+        
+        if method == "subtract":
+            # Original method: subtract contribution
+            contribution = self.compute_feature_contribution(z_n, feature_indices)
+            zL_ablated = zL - contribution
+        elif method == "reconstruct":
+            # New method: zero out features and use reconstruction only
+            mask = torch.ones(self.n_features, device=z_n.device, dtype=z_n.dtype)
+            mask[feature_indices] = 0.0
+            z_n_ablated = z_n * mask[None, None, None, :]
+            
+            # For TSAE: reconstruction = x_prior + decode(z_n)
+            zL_ablated = x_prior + self.decode(z_n_ablated)
+            contribution = self.compute_feature_contribution(z_n, feature_indices)
+        else:
+            raise ValueError(f"Unknown ablation method: {method}")
+        
         return zL_ablated, z_n, contribution
 
 
@@ -329,6 +368,7 @@ class AblationConfig(pydantic.BaseModel):
     max_error_changes: int = 0  # Stop after N error changes (0 = no limit, run all K)
     ablation_step: int = 1  # Ablate in groups of N features (1 = one by one, 10 = groups of 10)
     save_all_images: bool = False  # Save images for all K (not just when errors change)
+    ablation_method: str = "subtract"  # "subtract" = remove contribution, "reconstruct" = use SAE recon only
     
     # For all_individually mode
     only_active_features: bool = True  # Only test features that are active for this sample
@@ -488,24 +528,26 @@ def load_visualization_context(config: AblationConfig) -> Dict:
 
 
 def collect_trajectories_with_intervention(
-    model, 
-    batch, 
+    model,
+    batch,
     sae,
     ablate_features: Optional[List[int]] = None,
     ablate_iterations: Optional[List[int]] = None,
+    ablation_method: str = "subtract",
     max_steps: int = 16
 ) -> Tuple[torch.Tensor, Dict, List[torch.Tensor]]:
     """
     Run inference and optionally ablate SAE features during specific iterations.
-    
+
     Args:
         model: TRM model
         batch: input batch
         sae: SAE model
         ablate_features: list of feature indices to ablate (None = no ablation)
         ablate_iterations: which iterations to apply ablation (None = all, 0-indexed)
+        ablation_method: "subtract" or "reconstruct"
         max_steps: maximum inference steps
-    
+
     Returns:
         z_L_trajectory: [B, D, L, H] collected trajectories
         preds: final predictions
@@ -559,17 +601,24 @@ def collect_trajectories_with_intervention(
                     if should_ablate:
                         # Reshape z_L for SAE: [B, L, H] -> [B, 1, L, H]
                         z_L_for_sae = z_L_state.unsqueeze(1)
-                        
+
                         # Ablate features
-                        z_L_ablated, z_n, contribution = sae.ablate_features(z_L_for_sae, ablate_features)
+                        z_L_ablated, z_n, contribution = sae.ablate_features(z_L_for_sae, ablate_features, method=ablation_method)
                         z_L_ablated = z_L_ablated.squeeze(1)
                         
+                        # Compute norms for analysis
+                        z_L_norm = z_L_for_sae.norm().item()
+                        contribution_norm = contribution.norm().item()
+                        ratio = contribution_norm / (z_L_norm + 1e-8)  # contribution / z_L ratio
+
                         # Update carry with ablated z_L
                         carry = set_z_L(carry, z_L_ablated)
-                        
+
                         ablation_info.append({
                             'step': step,
-                            'contribution_norm': contribution.norm().item(),
+                            'z_L_norm': z_L_norm,
+                            'contribution_norm': contribution_norm,
+                            'ratio': ratio,  # contribution_norm / z_L_norm
                             'z_n_sum': z_n[..., ablate_features].sum().item()
                         })
             
@@ -950,6 +999,7 @@ def run_individual_feature_ablation(
             model, batch_float, sae,
             ablate_features=[feat_idx],
             ablate_iterations=config.ablation_iterations,
+            ablation_method=config.ablation_method,
             max_steps=16
         )
         
@@ -1198,12 +1248,21 @@ def run_progressive_ablation(
     # Results storage
     all_k_results = []
     change_visualizations = []
+    change_points = []  # Store (k, num_diff, pred_grid) at each error change point
     
     # Track previous prediction for comparison
     prev_preds = original_preds.copy()
     prev_k = 0
     prev_features = []
     prev_num_diff = orig_num_diff  # Track previous number of errors
+    
+    # Store original as the first change point
+    change_points.append({
+        'k': 0,
+        'num_diff': int(orig_num_diff),
+        'pred_grid': orig_pred_grid.copy(),
+        'is_correct': bool(is_correct_orig),
+    })
     
     # Record K=0 (original)
     all_k_results.append({
@@ -1237,11 +1296,18 @@ def run_progressive_ablation(
     
     # Progressive ablation with step size
     step = config.ablation_step
-    for k in range(step, max_k + 1, step):
+    # Build list of K values: step, 2*step, ..., and force add max_k at the end
+    k_values = list(range(step, max_k + 1, step))
+    if max_k not in k_values:
+        k_values.append(max_k)
+    print(f"    K values to test: {k_values[:5]}...{k_values[-3:]} (total {len(k_values)})")
+    
+    for k in k_values:
         # Get top-k features to ablate
         features_to_ablate = list(ranked_indices[:k])
-        # New features added in this step (from k-step+1 to k)
-        new_features = [int(ranked_indices[i]) for i in range(max(0, k-step), k)]
+        # New features added in this step (handle variable step size for last K)
+        prev_k_in_list = k_values[k_values.index(k) - 1] if k_values.index(k) > 0 else 0
+        new_features = [int(ranked_indices[i]) for i in range(prev_k_in_list, k)]
         new_feature_str = f"{new_features[0]}" if len(new_features) == 1 else f"{new_features[0]}~{new_features[-1]}"
         
         # Run ablation
@@ -1249,14 +1315,22 @@ def run_progressive_ablation(
             model, batch_float, sae,
             ablate_features=features_to_ablate,
             ablate_iterations=config.ablation_iterations,
+            ablation_method=config.ablation_method,
             max_steps=16
         )
         
         curr_preds = preds_abl["preds"].cpu().numpy()[0] if preds_abl and "preds" in preds_abl else labels
-        
-        # Compute ablation contribution (for debugging)
-        total_contribution = sum(info.get('contribution_norm', 0) for info in ablation_info) if ablation_info else 0
-        
+
+        # Compute ablation norms (for debugging)
+        if ablation_info:
+            total_z_L_norm = sum(info.get('z_L_norm', 0) for info in ablation_info)
+            total_contribution = sum(info.get('contribution_norm', 0) for info in ablation_info)
+            avg_ratio = sum(info.get('ratio', 0) for info in ablation_info) / len(ablation_info)
+        else:
+            total_z_L_norm = 0
+            total_contribution = 0
+            avg_ratio = 0
+
         # Compute accuracy
         curr_pred_grid = decode_arc_grid(curr_preds)
         is_correct_curr = np.array_equal(label_grid, curr_pred_grid)
@@ -1273,13 +1347,24 @@ def run_progressive_ablation(
             'is_correct': bool(is_correct_curr),
             'num_diff': int(curr_num_diff),
             'error_count_changed': bool(error_count_changed),
+            'z_L_norm': float(total_z_L_norm),
             'contribution_norm': float(total_contribution),
+            'contribution_ratio': float(avg_ratio),  # contribution_norm / z_L_norm
         }
         all_k_results.append(k_result)
-        
-        # Status indicator with contribution info
+
+        # Status indicator with norm info
         change_marker = f" *ERRORS CHANGED: {prev_num_diff}→{curr_num_diff}*" if error_count_changed else ""
-        print(f"    K={k}: {'✓' if is_correct_curr else '✗'} ({curr_num_diff} errors) [+feat {new_feature_str}] contrib={total_contribution:.2f}{change_marker}")
+        print(f"    K={k}: {'✓' if is_correct_curr else '✗'} ({curr_num_diff} err) | z_L={total_z_L_norm:.1f} contrib={total_contribution:.1f} ratio={avg_ratio:.3f}{change_marker}")
+        
+        # Store change point for summary image (always track, regardless of save)
+        if error_count_changed:
+            change_points.append({
+                'k': int(k),
+                'num_diff': int(curr_num_diff),
+                'pred_grid': curr_pred_grid.copy(),
+                'is_correct': bool(is_correct_curr),
+            })
         
         # Save visualization: all images OR only when errors changed
         should_save = config.save_all_images or error_count_changed
@@ -1315,6 +1400,46 @@ def run_progressive_ablation(
         prev_features = [int(f) for f in features_to_ablate]
         prev_num_diff = curr_num_diff  # Track previous error count
     
+    # Generate summary image with all change points in one row
+    print(f"    Total change points collected: {len(change_points)}")
+    if len(change_points) > 1:
+        num_points = len(change_points)
+        # Add 2 for input and ground truth
+        total_cols = 2 + num_points
+        
+        fig, axes = plt.subplots(1, total_cols, figsize=(4 * total_cols, 5))
+        
+        # 1. Test Input
+        input_grid = decode_arc_grid(inputs)
+        visualize_grid(input_grid, axes[0], "Input")
+        
+        # 2. Ground Truth
+        visualize_grid(label_grid, axes[1], "GT", highlight_color='#0074D9')
+        
+        # 3. All change points (K=0, K=100, K=500, ...)
+        for idx, cp in enumerate(change_points):
+            k_val = cp['k']
+            num_diff = cp['num_diff']
+            pred_grid = cp['pred_grid']
+            is_correct = cp['is_correct']
+            
+            status = "✓" if is_correct else f"✗({num_diff})"
+            color = '#2ECC40' if is_correct else '#FF4136'
+            title = f"K={k_val}\n{status}"
+            
+            visualize_grid(pred_grid, axes[2 + idx], title, highlight_color=color)
+        
+        # Create title with error progression
+        error_progression = " → ".join([f"{cp['num_diff']}" for cp in change_points])
+        plt.suptitle(f"{puzzle_name} | Error progression: {error_progression}", 
+                     fontsize=12, fontweight='bold')
+        plt.tight_layout(rect=[0, 0, 1, 0.92])
+        
+        summary_img_path = os.path.join(puzzle_dir, "summary_all_changes.png")
+        plt.savefig(summary_img_path, dpi=150, bbox_inches='tight', facecolor='white')
+        plt.close()
+        print(f"    Summary image saved: summary_all_changes.png ({len(change_points)} change points)")
+    
     # Save puzzle-level summary (convert all numpy types to Python types)
     puzzle_summary = {
         'puzzle_name': puzzle_name,
@@ -1327,6 +1452,7 @@ def run_progressive_ablation(
         'metric_values_top_k': [float(metric_values[i]) for i in ranked_indices[:max_k]],
         'all_k_results': all_k_results,  # Already properly typed
         'num_changes': len(change_visualizations),
+        'change_points': [{'k': cp['k'], 'num_diff': cp['num_diff'], 'is_correct': cp['is_correct']} for cp in change_points],
         'change_visualizations': change_visualizations,
     }
     
@@ -1369,6 +1495,7 @@ def main(hydra_config: DictConfig):
         max_error_changes=hydra_config.get('max_error_changes', 0),
         ablation_step=hydra_config.get('ablation_step', 1),
         save_all_images=hydra_config.get('save_all_images', False),
+        ablation_method=hydra_config.get('ablation_method', 'subtract'),
         only_active_features=hydra_config.get('only_active_features', True),
         save_only_on_change=hydra_config.get('save_only_on_change', True),
         puzzle_ids=list(hydra_config.get('puzzle_ids', [])) if hydra_config.get('puzzle_ids') else None,
@@ -1390,6 +1517,7 @@ def main(hydra_config: DictConfig):
         print(f"  - Save only on change: {config.save_only_on_change}")
     elif config.ablation_mode == "progressive":
         print(f"  - Ranking Metric: {config.ranking_metric}")
+        print(f"  - Ablation Method: {config.ablation_method}")
         print(f"  - Max K Features: {config.max_k_features}")
         print(f"  - Ablation Step: {config.ablation_step} (group size)")
         print(f"  - Max Error Changes: {config.max_error_changes} (0=no limit)")
@@ -1581,6 +1709,7 @@ def main(hydra_config: DictConfig):
                         model, single_batch_float, sae,
                         ablate_features=features_to_ablate,
                         ablate_iterations=config.ablation_iterations,
+                        ablation_method=config.ablation_method,
                         max_steps=16
                     )
                     

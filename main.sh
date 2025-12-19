@@ -122,7 +122,8 @@ SAE_MODEL_TYPE="sae"
 MAX_K=4096
 ABLATION_STEP=100     # Group size: ablate N features at a time (1=one by one, 10=groups of 10)
 MAX_ERROR_CHANGES=0   # Stop after N error-change points (0=no limit)
-SAVE_ALL_IMAGES=true  # Save images for all K (not just when errors change)
+SAVE_ALL_IMAGES=false # Save images for all K (not just when errors change)
+ABLATION_METHOD="reconstruct"  # "subtract" = remove contribution, "reconstruct" = use SAE recon only
 SORT_BY_ITERATION=1
 ANSWER_ONLY=false
 PUZZLE_IDS="[0,778,1779,2780,3781,4782,5784,6785,6857,7858,8859,9860,10861,11862,12863,13864,14865,15866,16867,17443]"
@@ -133,7 +134,7 @@ NUM_VISUALIZE=20
 # Higher activation sum = More important feature
 # ------------------------------------------------------------------------------
 RANKING_METRIC="avg_activation"
-OUTPUT_DIR="ablation_progressive_${SAE_MODEL_TYPE}_${RANKING_METRIC}_${ANSWER_ONLY}"
+OUTPUT_DIR="ablation_progressive_${SAE_MODEL_TYPE}_${RANKING_METRIC}_${ABLATION_METHOD}_${ANSWER_ONLY}"
 
 echo "=============================================="
 echo "Running Progressive Ablation with ${RANKING_METRIC}"
@@ -151,6 +152,7 @@ python ablation_sae_features.py \
   ++output_dir=${OUTPUT_DIR} \
   ++ablation_mode=progressive \
   ++ranking_metric=${RANKING_METRIC} \
+  ++ablation_method=${ABLATION_METHOD} \
   ++max_k_features=${MAX_K} \
   ++ablation_step=${ABLATION_STEP} \
   ++max_error_changes=${MAX_ERROR_CHANGES} \
@@ -164,33 +166,34 @@ python ablation_sae_features.py \
 # Metric 2: activation_freq - Rank by how often feature is in top-K (64)
 # Higher frequency = More important feature
 # ------------------------------------------------------------------------------
-RANKING_METRIC="activation_freq"
-OUTPUT_DIR="ablation_progressive_${SAE_MODEL_TYPE}_${RANKING_METRIC}_${ANSWER_ONLY}"
+# RANKING_METRIC="activation_freq"
+# OUTPUT_DIR="ablation_progressive_${SAE_MODEL_TYPE}_${RANKING_METRIC}_${ABLATION_METHOD}_${ANSWER_ONLY}"
 
-echo "=============================================="
-echo "Running Progressive Ablation with ${RANKING_METRIC}"
-echo "=============================================="
+# echo "=============================================="
+# echo "Running Progressive Ablation with ${RANKING_METRIC}"
+# echo "=============================================="
 
-rm -rf ${OUTPUT_DIR}
-python ablation_sae_features.py \
-  --config-path=ckpt/arc_v1_public \
-  --config-name=all_config \
-  load_checkpoint=ckpt/arc_v1_public/step_518071 \
-  data_paths="[data/arc1concept-aug-1000]" \
-  data_paths_test="[data/arc1concept-aug-1000]" \
-  global_batch_size=1 \
-  ++sae_model_type=${SAE_MODEL_TYPE} \
-  ++output_dir=${OUTPUT_DIR} \
-  ++ablation_mode=progressive \
-  ++ranking_metric=${RANKING_METRIC} \
-  ++max_k_features=${MAX_K} \
-  ++ablation_step=${ABLATION_STEP} \
-  ++max_error_changes=${MAX_ERROR_CHANGES} \
-  ++save_all_images=${SAVE_ALL_IMAGES} \
-  ++sort_by_iteration=${SORT_BY_ITERATION} \
-  ++answer_only=${ANSWER_ONLY} \
-  ++num_visualize=${NUM_VISUALIZE} \
-  ++puzzle_ids="${PUZZLE_IDS}"
+# rm -rf ${OUTPUT_DIR}
+# python ablation_sae_features.py \
+#   --config-path=ckpt/arc_v1_public \
+#   --config-name=all_config \
+#   load_checkpoint=ckpt/arc_v1_public/step_518071 \
+#   data_paths="[data/arc1concept-aug-1000]" \
+#   data_paths_test="[data/arc1concept-aug-1000]" \
+#   global_batch_size=1 \
+#   ++sae_model_type=${SAE_MODEL_TYPE} \
+#   ++output_dir=${OUTPUT_DIR} \
+#   ++ablation_mode=progressive \
+#   ++ranking_metric=${RANKING_METRIC} \
+#   ++ablation_method=${ABLATION_METHOD} \
+#   ++max_k_features=${MAX_K} \
+#   ++ablation_step=${ABLATION_STEP} \
+#   ++max_error_changes=${MAX_ERROR_CHANGES} \
+#   ++save_all_images=${SAVE_ALL_IMAGES} \
+#   ++sort_by_iteration=${SORT_BY_ITERATION} \
+#   ++answer_only=${ANSWER_ONLY} \
+#   ++num_visualize=${NUM_VISUALIZE} \
+#   ++puzzle_ids="${PUZZLE_IDS}"
 
 echo "=============================================="
 echo "Progressive Ablation Complete!"
